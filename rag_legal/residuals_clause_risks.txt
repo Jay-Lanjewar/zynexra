@@ -1,0 +1,16 @@
+RESIDUALS CLAUSE RISK INTELLIGENCE
+
+Residuals clauses allow use of information retained in memory.
+
+HIGH RISK CONDITIONS:
+- No restriction on use.
+- No exclusion of trade secrets.
+- No time limitation.
+- No obligation to avoid deliberate memorization.
+
+COMMERCIAL IMPACT:
+Residuals clause may effectively nullify confidentiality protection.
+
+ESCALATION RULE:
+If residuals clause allows unrestricted use,
+Severity should be HIGH or CRITICAL.

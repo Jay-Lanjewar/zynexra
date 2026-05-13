@@ -1,0 +1,31 @@
+NDA BEST PRACTICES – RISK INTELLIGENCE NOTES
+
+CONFIDENTIAL INFORMATION DEFINITION:
+- Should not be overly broad or vague.
+- Should clearly define scope.
+- Should avoid including casual oral statements unless documented.
+- Should define marking requirements or confirmation process.
+
+EXCLUSIONS:
+- Must clearly state exclusions.
+- Absence of exclusions creates enforceability ambiguity.
+
+TERM:
+- Agreement term and confidentiality survival must be separate.
+- Trade secrets should survive indefinitely.
+- Fixed short survival (<2 years) weakens protection.
+
+PURPOSE LIMITATION:
+- Should clearly restrict use to defined purpose.
+- Broad purpose definitions weaken enforceability.
+
+REMEDIES:
+- Should allow injunctive relief.
+- Absence of remedy clause reduces enforcement leverage.
+
+DATA SECURITY:
+- Should specify standard of care (reasonable care or industry standard).
+- No protection standard clause is a weakness.
+
+MUTUALITY:
+- One-sided obligations increase negotiation risk.

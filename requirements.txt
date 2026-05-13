@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+requests
+httpx
+faiss-cpu
+numpy
+streamlit
+chromadb>=0.5.0
+ollama
+pymupdf
+python-multipart

@@ -1,0 +1,18 @@
+INDEMNIFICATION RISK PATTERNS
+
+BEST PRACTICE:
+- Indemnity limited to breaches caused by indemnifying party.
+- Includes defense control mechanism.
+- Includes reasonable attorney fees.
+- Often includes liability cap.
+
+RISK CONDITIONS:
+- Unlimited indemnity.
+- Indemnity applies regardless of fault.
+- No cap on damages.
+- No exclusion of consequential damages.
+- No reciprocal indemnity in mutual NDA.
+
+ESCALATION RULE:
+If indemnity is unlimited AND no liability cap exists,
+Severity should be HIGH or CRITICAL.

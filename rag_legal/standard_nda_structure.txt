@@ -1,0 +1,28 @@
+STANDARD NDA STRUCTURE REFERENCE
+
+A properly structured NDA typically includes:
+
+1. Parties and Effective Date
+2. Definition of Confidential Information
+3. Exclusions from Confidential Information
+   - Publicly available information
+   - Independently developed information
+   - Lawfully received from third parties
+   - Already known before disclosure
+4. Purpose Limitation (Permitted Use)
+5. Non-Disclosure Obligation
+6. Non-Use Obligation
+7. Protection Standard (reasonable care / industry standard)
+8. Term of Agreement
+9. Survival of Confidentiality Obligations
+   - Trade secrets typically survive indefinitely
+   - Other confidential information: 2–5 years common
+10. Return or Destruction of Information
+11. Remedies (injunctive relief)
+12. Governing Law and Jurisdiction
+13. No License Grant
+14. Assignment Restrictions
+15. Entire Agreement Clause
+16. Signatures
+
+MISSING any of the above may create structural weakness.

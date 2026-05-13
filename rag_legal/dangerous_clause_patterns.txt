@@ -1,0 +1,33 @@
+LEGAL RED FLAG PATTERNS
+
+CRITICAL RISK:
+- Confidentiality expires automatically without survival clause.
+- Residuals clause allowing memory-based use without restriction.
+- Unlimited indemnification without liability cap.
+- No limitation of liability clause.
+- Governing law unrelated to both parties without justification.
+- No exclusion clause for public information.
+
+HIGH RISK:
+- Confidentiality term less than 2 years.
+- One-sided indemnity.
+- No return/destruction requirement.
+- No purpose limitation.
+- No remedy or injunctive relief provision.
+
+MEDIUM RISK:
+- Vague definition of confidential information.
+- Undefined “reasonable efforts.”
+- Ambiguous jurisdiction wording.
+- Overly broad definition without exclusions.
+
+LOW RISK:
+- Formatting inconsistencies.
+- Minor grammatical errors.
+
+CRITICAL ESCALATION RULES:
+
+- If confidentiality obligations cease upon termination → CRITICAL.
+- If indemnity is unlimited and no liability cap exists → CRITICAL.
+- If residuals clause allows unrestricted use → HIGH or CRITICAL.
+- If governing law is offshore without operational connection → HIGH.
