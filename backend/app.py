@@ -8,8 +8,12 @@ import time
 import re
 from fastapi import UploadFile, File, Form
 import pymupdf 
+from backend.config import settings
+from backend.logger import logger
 # RAG integration temporarily disabled; keep import commented for future use.
 # from backend.rag import query
+
+ollama_client = ollama.Client(host="http://host.docker.internal:11434")
 
 # =====================
 # Data Models
@@ -34,8 +38,6 @@ class ValidationContext:
 # =====================
 app = FastAPI(title="Zynexra API")
 
-MODEL_FAST = "gemma4:E4B"
-MODEL_FALLBACK = "qwen2.5:7b-instruct"
 CREATOR_STATEMENT = (
     "I was created by Jay Lanjewar."
 )
@@ -157,8 +159,8 @@ class ResponseGenerator:
             return self._generate_with_model(messages, model)
         except HTTPException as e:
             if self._should_fallback(e):
-                print(f"[MODEL FALLBACK] Switching to {MODEL_FALLBACK}")
-                return self._generate_with_model(messages, MODEL_FALLBACK)
+                logger.warning("Model fallback activated. Switching to %s", settings.MODEL_FALLBACK)
+                return self._generate_with_model(messages, settings.MODEL_FALLBACK)
             raise
     
     def _should_fallback(self, error: HTTPException) -> bool:
@@ -202,7 +204,7 @@ class ResponseGenerator:
         """
         try:
             # Single model call - no retries
-            stream = ollama.chat(
+            stream = ollama_client.chat(
                 model=model,
                 messages=messages,
                 stream=True,
@@ -229,11 +231,14 @@ class ResponseGenerator:
             # Re-raise HTTP exceptions as-is
             raise
         except ConnectionError as e:
+            logger.error("Model service connection failed: %s", e)
             raise HTTPException(503, f"Model service unavailable: {str(e)}")
         except TimeoutError as e:
+            logger.error("Model request timed out: %s", e)
             raise HTTPException(504, f"Model request timeout: {str(e)}")
         except Exception as e:
             # Catch all other exceptions and convert to HTTP 500
+            logger.error("Unexpected model communication error: %s", e)
             raise HTTPException(500, f"Model communication error: {str(e)}")
     
     def stream_to_user(self, content: str):
@@ -819,6 +824,8 @@ def ask(q: Query):
     if not q.session_id:
         raise HTTPException(422, "session_id required")
 
+    logger.info("Incoming /ask request. session_id=%s", q.session_id)
+
     session = sessions.get(q.session_id)
     text = q.question.strip()
 
@@ -866,7 +873,7 @@ def ask(q: Query):
         yield ""
         # Always try fast model first. ResponseGenerator handles fallback internally.
         try:
-            complete_response = response_generator.generate_response(messages, MODEL_FAST)
+            complete_response = response_generator.generate_response(messages, settings.MODEL_FAST)
             complete_response = normalize_issue_severity(complete_response)
             complete_response = normalize_issue_output(complete_response)
         except HTTPException as http_err:
@@ -874,6 +881,7 @@ def ask(q: Query):
             raise http_err
         except Exception as e:
             # Handle any unexpected errors during generation
+            logger.error("Unexpected error during /ask generation. session_id=%s error=%s", q.session_id, e)
             raise HTTPException(500, f"Unexpected error during generation: {str(e)}")
         
         # Post-generation validation using ValidationEngine
@@ -887,6 +895,7 @@ def ask(q: Query):
             validation_result = validation_engine.validate_response(complete_response, validation_context)
         except Exception as e:
             # Handle validation engine failures gracefully
+            logger.error("Validation error during /ask. session_id=%s error=%s", q.session_id, e)
             raise HTTPException(500, f"Validation error: {str(e)}")
         
         if validation_result.is_valid:
@@ -930,6 +939,7 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
             text += page.get_text()
         return text
     except Exception as e:
+        logger.error("PDF extraction failed: %s", e)
         raise HTTPException(400, f"PDF processing error: {str(e)}")
 
 @app.post("/ask_file")
@@ -943,10 +953,12 @@ def ask_file(
         session = sessions.get(session_id)
 
         filename = file.filename.lower() if file.filename else ""
+        logger.info("Uploaded file received. session_id=%s filename=%s", session_id, filename)
         
         if not filename.endswith((".txt", ".pdf")):
             raise HTTPException(400, "Only .txt and .pdf files supported")
 
+        logger.info("Starting file processing. session_id=%s filename=%s", session_id, filename)
         content = file.file.read()
         if not content:
             raise HTTPException(400, "Empty file")
@@ -960,6 +972,7 @@ def ask_file(
             try:
                 text = content.decode("utf-8", errors="ignore")
             except Exception as e:
+                logger.error("File encoding error. session_id=%s filename=%s error=%s", session_id, filename, e)
                 raise HTTPException(400, f"File encoding error: {str(e)}")
 
         if len(text) > 20000:
@@ -1008,7 +1021,7 @@ def ask_file(
             {"role": "user", "content": text}
         ]
 
-        complete_response = response_generator.generate_response(messages, MODEL_FAST)
+        complete_response = response_generator.generate_response(messages, settings.MODEL_FAST)
         complete_response = normalize_issue_severity(complete_response)
         complete_response = normalize_issue_output(complete_response)
 
@@ -1045,6 +1058,7 @@ def ask_file(
         raise
     except Exception as e:
         # Handle any unexpected file processing errors
+        logger.error("Unexpected file processing error. session_id=%s filename=%s error=%s", session_id, file.filename, e)
         raise HTTPException(500, f"File processing error: {str(e)}")
 
 @app.post("/reset")

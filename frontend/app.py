@@ -6,7 +6,7 @@ import uuid
 # =========================
 # API CONFIG
 # =========================
-API_BASE = "http://localhost:8000"
+API_BASE = "http://backend:8000"
 API_ASK = f"{API_BASE}/ask"
 API_ASK_FILE = f"{API_BASE}/ask_file"
 API_MODE = f"{API_BASE}/set_mode"

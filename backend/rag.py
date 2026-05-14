@@ -3,6 +3,7 @@ import re
 import chromadb
 import ollama
 import sys
+from backend.logger import logger
 
 EMBED_MODEL = "nomic-embed-text"
 
@@ -68,7 +69,7 @@ def ingest(folder: str):
             )
             doc_id += 1
 
-    print("Ingestion complete.")
+    logger.info("Ingestion complete.")
 
 
 # =========================================================
@@ -102,6 +103,6 @@ if __name__ == "__main__":
             folder = sys.argv[2]
             ingest(folder)
         else:
-            print("Usage: python rag.py --ingest <folder>")
+            logger.info("Usage: python rag.py --ingest <folder>")
     else:
-        print("Usage: python rag.py --ingest <folder>")
+        logger.info("Usage: python rag.py --ingest <folder>")
