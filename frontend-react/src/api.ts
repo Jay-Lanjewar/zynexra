@@ -1,4 +1,4 @@
-import type { AuditResponse } from "./types";
+import type { AppMode, AuditResponse, ChatMessage, RedactionOptions } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -7,19 +7,45 @@ export type ApiError = {
   message: string;
 };
 
+export type HistoryRecord = {
+  id: number;
+  filename: string;
+  timestamp: string;
+  mode?: string;
+  issue_count?: number;
+  redaction_count?: number;
+  title?: string;
+};
+
+export type HistoryResponse = {
+  success: boolean;
+  records: HistoryRecord[];
+  total: number;
+  message?: string;
+};
+
 export function getApiBaseUrl(): string {
   return API_BASE_URL;
 }
 
 export async function auditContractFile(
   file: File,
+  mode: Exclude<AppMode, "ADVISORY"> = "AUDIT",
+  redactionOptions?: RedactionOptions,
   onProgress?: (progress: number) => void
 ): Promise<AuditResponse> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("session_id", crypto.randomUUID());
-  formData.append("mode", "AUDIT");
+  formData.append("mode", mode);
   formData.append("response_format", "json");
+  if (mode === "REDACTION" && redactionOptions) {
+    formData.append("redact_emails", String(redactionOptions.emails));
+    formData.append("redact_phones", String(redactionOptions.phones));
+    formData.append("redact_names", String(redactionOptions.names));
+    formData.append("redact_addresses", String(redactionOptions.addresses));
+    formData.append("redact_companies", String(redactionOptions.companies));
+  }
 
   try {
     if (onProgress) onProgress(10);
@@ -48,7 +74,7 @@ export async function auditContractFile(
     console.log("[API] Parsed response:", payload);
 
     if (!response.ok || payload.success === false) {
-      const backendMessage = payload.detail || payload.legacy_text || payload.message || `Audit request failed with status ${response.status}`;
+      const backendMessage = payload.detail || payload.legacy_text || payload.message || `Request failed with status ${response.status}`;
       console.log("[API] Backend error message:", backendMessage);
 
       if (response.status === 413) {
@@ -94,6 +120,94 @@ export async function auditContractFile(
       }
       if (error.message.includes("network") || error.message.includes("connection")) {
         throw { code: "NETWORK_ERROR", message: "Unable to connect to the backend. Please verify the server is running." } as ApiError;
+      }
+      throw { code: "SERVER_ERROR", message: error.message } as ApiError;
+    }
+
+    throw { code: "SERVER_ERROR", message: "An unexpected error occurred." } as ApiError;
+  }
+}
+
+export async function askAdvisoryQuestion(
+  question: string,
+  sessionId: string,
+  history: ChatMessage[] = [],
+  onProgress?: (progress: number) => void
+): Promise<AuditResponse> {
+  try {
+    if (onProgress) onProgress(20);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+    const contextMessages = history.slice(-8);
+    const taskAnchor = contextMessages.length > 0
+      ? [
+          "FRONTEND CONVERSATION CONTEXT:",
+          "Use this only to preserve continuity if server-side session history is unavailable.",
+          ...contextMessages.map((message) => `${message.role.toUpperCase()}: ${message.content}`),
+        ].join("\n")
+      : undefined;
+
+    const response = await fetch(`${API_BASE_URL}/ask?response_format=json`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question,
+        session_id: sessionId,
+        mode: "ADVISORY",
+        response_format: "json",
+        task_anchor: taskAnchor,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (onProgress) onProgress(80);
+
+    const contentType = response.headers.get("content-type") ?? "";
+    const payload = contentType.includes("application/json")
+      ? await response.json()
+      : { success: false, legacy_text: await response.text() };
+
+    if (!response.ok || payload.success === false) {
+      const backendMessage = payload.detail || payload.legacy_text || payload.message || `Request failed with status ${response.status}`;
+
+      if (response.status === 400) {
+        throw { code: "VALIDATION_ERROR", message: backendMessage } as ApiError;
+      }
+
+      if (response.status === 422) {
+        throw { code: "REQUEST_ERROR", message: backendMessage } as ApiError;
+      }
+
+      if (response.status >= 500) {
+        throw { code: "SERVER_ERROR", message: backendMessage } as ApiError;
+      }
+
+      throw { code: "SERVER_ERROR", message: backendMessage } as ApiError;
+    }
+
+    if (onProgress) onProgress(100);
+
+    return payload as AuditResponse;
+  } catch (error) {
+    console.log("[API] Advisory exception:", error);
+
+    if ((error as ApiError).code) {
+      throw error;
+    }
+
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw { code: "NETWORK_ERROR", message: "Unable to connect to the backend. Please verify the server is running." } as ApiError;
+    }
+
+    if (error instanceof Error) {
+      if (error.name === "AbortError") {
+        throw { code: "TIMEOUT_ERROR", message: "The request timed out. The backend may be taking too long to respond." } as ApiError;
       }
       throw { code: "SERVER_ERROR", message: error.message } as ApiError;
     }

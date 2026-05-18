@@ -22,14 +22,22 @@ export function ExportButtons({ result, fileName = "audit-report" }: ExportButto
 
   const handleExportText = () => {
     const lines: string[] = [];
-    lines.push(`Zynexra Contract Audit Report`);
+    const mode = result.mode ?? "AUDIT";
+    const textOutput = result.redacted_text || result.advisory_text || result.legacy_text;
+    lines.push(`Zynexra ${mode.charAt(0)}${mode.slice(1).toLowerCase()} Report`);
     lines.push(`Generated: ${new Date().toISOString()}`);
     lines.push(`Model: ${result.model}`);
-    lines.push(`Issues Found: ${result.issue_count}`);
+    lines.push(`Mode: ${mode}`);
+    if (mode === "AUDIT") {
+      lines.push(`Issues Found: ${result.issue_count}`);
+    }
     lines.push("");
     lines.push("=".repeat(50));
 
-    if (result.structured_parse_failed) {
+    if (mode !== "AUDIT") {
+      lines.push("");
+      lines.push(textOutput || "");
+    } else if (result.structured_parse_failed) {
       lines.push("");
       lines.push("PARSE WARNING: Structured parsing failed.");
       if (result.legacy_text) {

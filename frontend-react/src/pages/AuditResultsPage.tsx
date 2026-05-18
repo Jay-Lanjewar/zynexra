@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, AlertCircle, CheckCircle2, Eraser, FileSearch, MessageSquareText, ShieldCheck } from "lucide-react";
 import { CollapsibleIssueCard } from "../components/CollapsibleIssueCard";
 import { ExportButtons } from "../components/ExportButtons";
 import { EmptyState } from "../components/EmptyState";
@@ -85,7 +85,11 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
     );
   }
 
-  if (result.issue_count === 0 && !result.structured_parse_failed) {
+  const mode = result.mode ?? "AUDIT";
+  const isAuditMode = mode === "AUDIT";
+  const displayText = result.redacted_text || result.advisory_text || result.legacy_text || "";
+
+  if (isAuditMode && result.issue_count === 0 && !result.structured_parse_failed) {
     return (
       <main className="mx-auto min-h-screen w-full max-w-3xl px-5 py-8 sm:px-8">
         <EmptyState type="NO_ISSUES" onReset={onReset} />
@@ -94,17 +98,29 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
   }
 
   const groups = groupIssuesByCategory(result.issues);
+  const ModeIcon = mode === "REDACTION" ? Eraser : mode === "ADVISORY" ? MessageSquareText : FileSearch;
+  const modeLabel = mode === "REDACTION" ? "Redaction Results" : mode === "ADVISORY" ? "Advisory Response" : "Audit Results";
+  const heading = mode === "AUDIT"
+    ? `${result.issue_count} issue${result.issue_count !== 1 ? "s" : ""} found`
+    : mode === "REDACTION"
+      ? "Redacted output"
+      : "Advisory guidance";
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-5 py-8 sm:px-8">
       <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Audit Results</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950">
-            {result.issue_count} issue{result.issue_count !== 1 ? "s" : ""} found
-          </h1>
-          <SeveritySummary issues={result.issues} />
-          <CategorySummary issues={result.issues} />
+          <p className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            <ModeIcon className="h-4 w-4" aria-hidden="true" />
+            {modeLabel}
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold text-slate-950">{heading}</h1>
+          {isAuditMode ? (
+            <>
+              <SeveritySummary issues={result.issues} />
+              <CategorySummary issues={result.issues} />
+            </>
+          ) : null}
         </div>
         <div className="flex flex-col items-end gap-3 sm:flex-row">
           <ExportButtons result={result} />
@@ -114,12 +130,22 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
             className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            New audit
+            New request
           </button>
         </div>
       </header>
 
-      {result.structured_parse_failed ? (
+      {!isAuditMode ? (
+        <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+            <ModeIcon className="h-4 w-4" aria-hidden="true" />
+            {mode === "REDACTION" ? "Redacted Text" : "Advisory Text"}
+          </div>
+          <pre className="mt-4 max-h-[34rem] overflow-auto whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800">
+            {displayText || "The backend returned an empty response."}
+          </pre>
+        </section>
+      ) : result.structured_parse_failed ? (
         <section className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-5">
           <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
             <AlertCircle className="h-4 w-4" aria-hidden="true" />

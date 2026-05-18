@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { auditContractFile, type ApiError } from "./api";
+import { askAdvisoryQuestion, auditContractFile, type ApiError } from "./api";
+import { AdvisoryChatPage } from "./pages/AdvisoryChatPage";
 import { AuditResultsPage } from "./pages/AuditResultsPage";
+import { RedactionResultsPage } from "./pages/RedactionResultsPage";
 import { UploadContractPage } from "./pages/UploadContractPage";
-import type { AuditResponse } from "./types";
+import type { AppMode, AuditResponse, ChatMessage, RedactionOptions } from "./types";
 
 export default function App() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -11,6 +13,19 @@ export default function App() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<ApiError | null>(null);
+  const [selectedMode, setSelectedMode] = useState<AppMode>("AUDIT");
+  const [redactionOptions, setRedactionOptions] = useState<RedactionOptions>({
+    emails: true,
+    phones: true,
+    names: true,
+    addresses: true,
+    companies: true,
+  });
+  const [advisorySessionId] = useState(() => crypto.randomUUID());
+  const [advisoryInput, setAdvisoryInput] = useState("");
+  const [advisoryMessages, setAdvisoryMessages] = useState<ChatMessage[]>([]);
+  const [advisoryError, setAdvisoryError] = useState<ApiError | null>(null);
+  const [isAdvisoryLoading, setIsAdvisoryLoading] = useState(false);
 
   async function handleSubmit() {
     if (!selectedFile) {
@@ -24,7 +39,12 @@ export default function App() {
     setApiError(null);
 
     try {
-      const auditResult = await auditContractFile(selectedFile, setUploadProgress);
+      const auditResult = await auditContractFile(
+        selectedFile,
+        selectedMode as Exclude<AppMode, "ADVISORY">,
+        redactionOptions,
+        setUploadProgress
+      );
       setResult(auditResult);
     } catch (caughtError) {
       const apiErr = caughtError as ApiError;
@@ -40,6 +60,76 @@ export default function App() {
     setError(null);
     setApiError(null);
     setUploadProgress(0);
+  }
+
+  async function handleAdvisorySend() {
+    const question = advisoryInput.trim();
+    if (!question || isAdvisoryLoading) return;
+
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: question,
+      createdAt: new Date().toISOString(),
+    };
+    const historyBeforeSend = advisoryMessages;
+
+    setAdvisoryMessages((messages) => [...messages, userMessage]);
+    setAdvisoryInput("");
+    setAdvisoryError(null);
+    setIsAdvisoryLoading(true);
+
+    try {
+      const response = await askAdvisoryQuestion(question, advisorySessionId, historyBeforeSend);
+      const assistantText = response.advisory_text || response.legacy_text || "";
+      const genericGreeting = /^(hello|hi|welcome|how can i help|how may i assist)[\s!.?,]*$/i.test(assistantText.trim());
+
+      const assistantMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: genericGreeting
+          ? "The backend returned a generic greeting instead of answering the supplied advisory question."
+          : assistantText || "The backend returned an empty advisory response.",
+        createdAt: new Date().toISOString(),
+      };
+      setAdvisoryMessages((messages) => [...messages, assistantMessage]);
+    } catch (caughtError) {
+      setAdvisoryError(caughtError as ApiError);
+    } finally {
+      setIsAdvisoryLoading(false);
+    }
+  }
+
+  function handleModeChange(mode: AppMode) {
+    setSelectedMode(mode);
+    setResult(null);
+    setError(null);
+    setApiError(null);
+    setAdvisoryError(null);
+  }
+
+  if (selectedMode === "ADVISORY") {
+    return (
+      <AdvisoryChatPage
+        messages={advisoryMessages}
+        inputValue={advisoryInput}
+        isLoading={isAdvisoryLoading}
+        error={advisoryError}
+        sessionId={advisorySessionId}
+        onInputChange={setAdvisoryInput}
+        onSend={handleAdvisorySend}
+        onModeChange={handleModeChange}
+      />
+    );
+  }
+
+  if (result?.mode === "REDACTION") {
+    return (
+      <RedactionResultsPage
+        result={result}
+        onReset={handleReset}
+      />
+    );
   }
 
   if (result || apiError) {
@@ -58,11 +148,15 @@ export default function App() {
       isLoading={isLoading}
       selectedFile={selectedFile}
       uploadProgress={uploadProgress}
+      selectedMode={selectedMode}
+      redactionOptions={redactionOptions}
       onFileChange={(file) => {
         setSelectedFile(file);
         setError(null);
         setApiError(null);
       }}
+      onModeChange={handleModeChange}
+      onRedactionOptionsChange={setRedactionOptions}
       onSubmit={handleSubmit}
     />
   );
