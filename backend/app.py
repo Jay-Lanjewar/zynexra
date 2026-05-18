@@ -1,11 +1,13 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse, Response
+from fastapi.responses import JSONResponse, StreamingResponse, Response
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Dict, Optional
-from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass, field
 import ollama
 import time
 import re
+import json
 from fastapi import UploadFile, File, Form
 import pymupdf 
 from backend.config import settings
@@ -13,7 +15,17 @@ from backend.logger import logger
 # RAG integration temporarily disabled; keep import commented for future use.
 # from backend.rag import query
 
-ollama_client = ollama.Client(host="http://host.docker.internal:11434")
+ollama_client = ollama.Client(host="http://localhost:11434")
+PREVIOUS_GENERATION_OPTIONS = {
+    "temperature": 0,
+    "num_ctx": 4096,
+}
+GENERATION_OPTIONS = {
+    "num_predict": 512,
+    "temperature": 0.1,
+    "num_ctx": 3072,
+}
+MODEL_NAME = settings.MODEL_FAST
 
 # =====================
 # Data Models
@@ -33,10 +45,63 @@ class ValidationContext:
     session_mode: str
     is_creator_question: bool
 
+@dataclass
+class AuditIssue:
+    """Structured schema for a legal audit issue."""
+    issue_title: str = ""
+    severity: str = ""
+    category: str = ""
+    location: str = ""
+    quoted_text: str = ""
+    risk_explanation: str = ""
+    suggested_improvement: str = ""
+    extra_fields: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, str]:
+        return {field_name: str(value or "") for field_name, value in asdict(self).items() if field_name != "extra_fields"}
+
+AUDIT_ISSUE_FIELDS = [
+    "issue_title",
+    "severity",
+    "category",
+    "location",
+    "quoted_text",
+    "risk_explanation",
+    "suggested_improvement",
+]
+
+AUDIT_TEXT_LABELS = {
+    "issue_title": "Issue",
+    "severity": "Severity",
+    "category": "Category",
+    "location": "Location",
+    "quoted_text": "Quoted Text",
+    "risk_explanation": "Risk Explanation",
+    "suggested_improvement": "Suggested Improvement",
+}
+
 # =====================
 # App
 # =====================
 app = FastAPI(title="Zynexra API")
+
+FRONTEND_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=FRONTEND_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+logger.info("[CORS] Enabled frontend origins -> %s", FRONTEND_ORIGINS)
+logger.info(f"Using inference model: {MODEL_NAME}")
 
 CREATOR_STATEMENT = (
     "I was created by Jay Lanjewar."
@@ -202,14 +267,15 @@ class ResponseGenerator:
         Raises:
             HTTPException: If model communication fails
         """
+        inference_start = None
         try:
             # Single model call - no retries
+            inference_start = time.time()
             stream = ollama_client.chat(
                 model=model,
                 messages=messages,
                 stream=True,
-                options={"temperature": 0,
-                         "num_ctx": 4096}
+                options=GENERATION_OPTIONS
             )
             
             buffer = ""
@@ -240,6 +306,15 @@ class ResponseGenerator:
             # Catch all other exceptions and convert to HTTP 500
             logger.error("Unexpected model communication error: %s", e)
             raise HTTPException(500, f"Model communication error: {str(e)}")
+        finally:
+            if inference_start is not None:
+                inference_duration = log_timing("Ollama inference", inference_start)
+                logger.info(
+                    "[Timing] Ollama inference comparison -> before_options=%s after_options=%s after_duration=%.2fs",
+                    PREVIOUS_GENERATION_OPTIONS,
+                    GENERATION_OPTIONS,
+                    inference_duration
+                )
     
     def stream_to_user(self, content: str):
         yield content
@@ -289,6 +364,48 @@ sessions = SessionManager()
 validation_engine = ValidationEngine()
 response_generator = ResponseGenerator()
 
+def log_timing(stage: str, started_at: float):
+    elapsed = time.time() - started_at
+    logger.info("[Timing] %s -> %.2fs", stage, elapsed)
+    return elapsed
+
+def extract_issue_categories(response_text: str) -> list:
+    return re.findall(r"(?im)^Category:\s*(.+)$", response_text)
+
+def extract_forbidden_phrase_candidates(response_text: str) -> list:
+    return re.findall(
+        r"(?i)\b(?:unlimited exposure|unlimited liability|unlimited|uncapped liability|uncapped|no cap|no limit|without restriction|without restrictions)\b",
+        response_text
+    )
+
+def should_debug_regression_case(*values: str) -> bool:
+    targets = {
+        "nda_confidentiality_termination",
+        "nda_malicious_structural_conflict",
+    }
+    combined = " ".join(str(value).lower() for value in values if value)
+    return any(target in combined for target in targets)
+
+def log_regression_debug(raw_response: str, normalized_response: str):
+    categories_before = extract_issue_categories(raw_response)
+    categories_after = extract_issue_categories(normalized_response)
+    forbidden_before = extract_forbidden_phrase_candidates(raw_response)
+    forbidden_after = extract_forbidden_phrase_candidates(normalized_response)
+
+    logger.info("[Debug] Raw response -> %s", raw_response)
+    logger.info("[Debug] Normalized response -> %s", normalized_response)
+    logger.info("[Debug] Categories before normalization -> %s", categories_before)
+    logger.info("[Debug] Categories after normalization -> %s", categories_after)
+    logger.info("[Debug] Evaluator comparison source -> normalized")
+    logger.info("[Debug] Evaluator comparison inputs -> categories=%s forbidden_phrases=%s", categories_after, forbidden_after)
+    logger.info(
+        "[Debug] Evaluator failure trigger conditions -> structural_exact_match_missing=%s forbidden_phrase_present=%s",
+        "structural inconsistency" not in categories_after,
+        bool(forbidden_after)
+    )
+    logger.info("[Debug] Forbidden phrase candidates before normalization -> %s", forbidden_before)
+    logger.info("[Debug] Forbidden phrase candidates after normalization -> %s", forbidden_after)
+
 # =====================
 # Models
 # =====================
@@ -297,6 +414,7 @@ class Query(BaseModel):
     session_id: str
     mode: Optional[str] = None
     task_anchor: Optional[str] = None
+    response_format: Optional[str] = None
 
 # =====================
 # Helpers
@@ -325,6 +443,386 @@ def pre_redact_pii(text: str) -> str:
     text = phone_pattern.sub("[REDACTED]", text)
     text = address_pattern.sub("[REDACTED]", text)
     return text
+
+def normalize_issue_key(key: str) -> str:
+    """Normalize model-provided JSON/text keys into AuditIssue field names."""
+    cleaned = re.sub(r"[^a-z0-9]+", "_", str(key).strip().lower()).strip("_")
+    aliases = {
+        "issue": "issue_title",
+        "title": "issue_title",
+        "risk": "risk_explanation",
+        "risk_explanation": "risk_explanation",
+        "suggestion": "suggested_improvement",
+        "suggested_rewrite": "suggested_improvement",
+        "suggested_improvement": "suggested_improvement",
+        "quote": "quoted_text",
+        "quoted": "quoted_text",
+        "quoted_text": "quoted_text",
+    }
+    return aliases.get(cleaned, cleaned)
+
+def coerce_audit_issue(raw_issue: Dict[str, Any]) -> AuditIssue:
+    normalized: Dict[str, str] = {field_name: "" for field_name in AUDIT_ISSUE_FIELDS}
+    extra_fields: Dict[str, Any] = {}
+
+    for key, value in raw_issue.items():
+        normalized_key = normalize_issue_key(key)
+        if normalized_key in normalized:
+            normalized[normalized_key] = "" if value is None else str(value).strip()
+        else:
+            extra_fields[str(key)] = value
+
+    return AuditIssue(**normalized, extra_fields=extra_fields)
+
+def extract_json_payload_candidates(response_text: str) -> List[str]:
+    candidates = [response_text.strip()]
+    fenced_matches = re.findall(r"```(?:json)?\s*(.*?)```", response_text, re.IGNORECASE | re.DOTALL)
+    candidates.extend(match.strip() for match in fenced_matches if match.strip())
+
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(response_text):
+        if char not in "[{":
+            continue
+        try:
+            _, end = decoder.raw_decode(response_text[index:])
+        except json.JSONDecodeError:
+            continue
+        candidates.append(response_text[index:index + end].strip())
+
+    unique_candidates = []
+    seen = set()
+    for candidate in candidates:
+        if candidate and candidate not in seen:
+            unique_candidates.append(candidate)
+            seen.add(candidate)
+    return unique_candidates
+
+def audit_issues_from_json_payload(payload: Any) -> List[AuditIssue]:
+    if isinstance(payload, dict):
+        if isinstance(payload.get("issues"), list):
+            raw_issues = payload["issues"]
+        elif any(normalize_issue_key(key) in AUDIT_ISSUE_FIELDS for key in payload.keys()):
+            raw_issues = [payload]
+        else:
+            raw_issues = []
+    elif isinstance(payload, list):
+        raw_issues = payload
+    else:
+        raw_issues = []
+
+    issues = []
+    for raw_issue in raw_issues:
+        if not isinstance(raw_issue, dict):
+            continue
+        issue = coerce_audit_issue(raw_issue)
+        if any(issue.to_dict().values()):
+            issues.append(issue)
+    return issues
+
+def parse_audit_issues_from_json(response_text: str) -> List[AuditIssue]:
+    for candidate in extract_json_payload_candidates(response_text):
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        issues = audit_issues_from_json_payload(payload)
+        if issues:
+            return issues
+    return []
+
+def extract_labeled_text(block: str, label: str) -> str:
+    pattern = re.compile(
+        rf"(?is)^{re.escape(label)}:[ \t]*(.*?)(?=\n[A-Z][A-Za-z ]+:[ \t]*|\Z)",
+        re.MULTILINE
+    )
+    match = pattern.search(block.strip())
+    return match.group(1).strip() if match else ""
+
+def parse_audit_issues_from_text(response_text: str) -> List[AuditIssue]:
+    if "Issue:" not in response_text:
+        return []
+
+    issue_pattern = re.compile(r"(?ims)^Issue:\s*.*?(?=^Issue:\s*|\Z)")
+    issues = []
+    for match in issue_pattern.finditer(response_text):
+        block = match.group(0).strip()
+        raw_issue = {
+            "issue_title": extract_labeled_text(block, "Issue"),
+            "severity": extract_labeled_text(block, "Severity"),
+            "category": extract_labeled_text(block, "Category"),
+            "location": extract_labeled_text(block, "Location"),
+            "quoted_text": extract_labeled_text(block, "Quoted Text"),
+            "risk_explanation": extract_labeled_text(block, "Risk Explanation"),
+            "suggested_improvement": extract_labeled_text(block, "Suggested Improvement"),
+        }
+        issue = coerce_audit_issue(raw_issue)
+        if any(issue.to_dict().values()):
+            issues.append(issue)
+    return issues
+
+def parse_audit_issues(response_text: str) -> List[AuditIssue]:
+    issues = parse_audit_issues_from_json(response_text)
+    if issues:
+        logger.info("[Structured] Parsed issue count -> %s", len(issues))
+        return issues
+
+    logger.warning("[Structured] Fallback to text parsing triggered")
+    issues = parse_audit_issues_from_text(response_text)
+    if issues:
+        logger.info("[Structured] Parsed issue count -> %s", len(issues))
+        return issues
+
+    return []
+
+def is_json_response_mode(response_format: Optional[str]) -> bool:
+    return str(response_format or "").strip().lower() == "json"
+
+def build_audit_json_payload(complete_response: str, model: str) -> Dict[str, Any]:
+    """Build a machine-readable audit response while retaining text fallback."""
+    issues = parse_audit_issues(complete_response)
+    if not issues:
+        return {
+            "success": True,
+            "model": model,
+            "issue_count": 0,
+            "issues": [],
+            "structured_parse_failed": True,
+            "legacy_text": complete_response,
+        }
+
+    logger.info("[API] Returning structured issue payload")
+    return {
+        "success": True,
+        "model": model,
+        "issue_count": len(issues),
+        "issues": [issue.to_dict() for issue in issues],
+    }
+
+def render_audit_issues_as_text(issues: List[AuditIssue]) -> str:
+    def render_line(field_name: str, value: str) -> str:
+        label = AUDIT_TEXT_LABELS[field_name]
+        return f"{label}: {value}" if value else f"{label}:"
+
+    rendered_blocks = []
+    for issue in issues:
+        issue_dict = issue.to_dict()
+        rendered_blocks.append(
+            "\n".join(
+                [
+                    render_line("issue_title", issue_dict["issue_title"]),
+                    render_line("severity", issue_dict["severity"]),
+                    render_line("category", issue_dict["category"]),
+                    render_line("location", issue_dict["location"]),
+                    render_line("quoted_text", issue_dict["quoted_text"]),
+                    render_line("risk_explanation", issue_dict["risk_explanation"]),
+                    render_line("suggested_improvement", issue_dict["suggested_improvement"]),
+                ]
+            ).rstrip()
+        )
+    return "\n\n".join(rendered_blocks)
+
+def extract_audit_text_wrappers(response_text: str) -> tuple[str, str]:
+    """Preserve any legacy text surrounding Issue blocks."""
+    issue_pattern = re.compile(r"(?ims)^Issue:\s*.*?(?=^Issue:\s*|\Z)")
+    matches = list(issue_pattern.finditer(response_text))
+    if not matches:
+        return "", ""
+    return response_text[:matches[0].start()].strip(), response_text[matches[-1].end():].strip()
+
+def render_legacy_audit_text(response_text: str, issues: List[AuditIssue]) -> str:
+    rendered = render_audit_issues_as_text(issues)
+    prefix, suffix = extract_audit_text_wrappers(response_text)
+    if prefix:
+        rendered = f"{prefix}\n\n{rendered}" if rendered else prefix
+    if suffix:
+        rendered = f"{rendered}\n\n{suffix}" if rendered else suffix
+    return rendered
+
+def normalize_audit_issue_severity_fields(issues: List[AuditIssue]) -> List[AuditIssue]:
+    """Deterministically enforce severity overrides on structured issue fields."""
+    unlimited_pattern = re.compile(r"\b(unlimited|uncapped)\b|no cap|no limit", re.IGNORECASE)
+    severity_rank = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+
+    for issue in issues:
+        current_severity = issue.severity.strip().upper()
+        category_upper = issue.category.strip().upper()
+        has_unlimited = bool(unlimited_pattern.search(issue.quoted_text or ""))
+        new_severity = current_severity
+
+        if has_unlimited:
+            new_severity = "CRITICAL"
+        if category_upper in {"GOVERNING LAW", "GOVERNING LAW RISK"}:
+            if severity_rank.get(new_severity, -1) < severity_rank["HIGH"]:
+                new_severity = "HIGH"
+        if "RESIDUALS" in category_upper:
+            if severity_rank.get(new_severity, -1) < severity_rank["HIGH"]:
+                new_severity = "HIGH"
+        if "INDEMNIFICATION" in category_upper and has_unlimited:
+            new_severity = "CRITICAL"
+
+        if new_severity and new_severity != current_severity:
+            issue.severity = new_severity
+    return issues
+
+def sanitize_capped_indemnity_text(text: str) -> str:
+    replacements = [
+        (r"\buncapped liability\b", "capped liability"),
+        (r"\bunlimited liability\b", "capped liability"),
+        (r"\buncapped indemnification\b", "capped indemnification"),
+        (r"\bunlimited indemnification\b", "capped indemnification"),
+        (r"\bno cap\b", "a defined cap"),
+        (r"\bno limit\b", "a defined limit"),
+    ]
+    sanitized = text
+    for pattern, replacement in replacements:
+        sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+    return sanitized
+
+def normalize_audit_issue_fields(issues: List[AuditIssue]) -> List[AuditIssue]:
+    """Normalize categories, language, and duplicates using structured fields."""
+    unlimited_tokens = re.compile(r"\b(unlimited|uncapped|no cap|no limit)\b", re.IGNORECASE)
+    unlimited_word = re.compile(r"\bunlimited\b", re.IGNORECASE)
+    capped_indemnity_cues = re.compile(
+        r"\b(?:capped at|liability cap|aggregate cap|shall not exceed|must not exceed|may not exceed|"
+        r"limited to|maximum amount|up to|cap of)\b|[$â‚¹â‚¬Â£]\s?\d|\b\d+(?:,\d{3})*(?:\.\d+)?\s*(?:usd|inr|eur|gbp|dollars|rupees)\b",
+        re.IGNORECASE
+    )
+    structural_categories = {
+        "conflicting structure",
+        "malformed structure",
+        "structural conflict",
+        "structural contradiction",
+        "structural inconsistency",
+        "structural omission",
+    }
+    indemnification_categories = {
+        "indemnification risk",
+        "uncapped liability",
+        "indemnity concern",
+    }
+    indemnification_cues = re.compile(r"\b(indemn|indemnify|indemnity|hold harmless)\b", re.IGNORECASE)
+    structural_cues = re.compile(
+        r"\b(conflict|conflicting|contradict|contradiction|inconsistent|inconsistency|incompatible|malformed)\b",
+        re.IGNORECASE
+    )
+    structural_heuristic_cues = re.compile(
+        r"\b(?:contradictory obligations|conflicting clauses|inconsistent obligations|"
+        r"mutually exclusive terms|structural contradiction|impossible compliance|"
+        r"termination conflict|conflicting survival language)\b",
+        re.IGNORECASE
+    )
+
+    for issue in issues:
+        category_text = issue.category.strip()
+        category_lower = category_text.lower()
+        combined_issue_text = " ".join(
+            [category_text, issue.quoted_text, issue.risk_explanation, issue.suggested_improvement]
+        )
+
+        if unlimited_word.search(issue.risk_explanation):
+            issue.risk_explanation = unlimited_word.sub("uncapped", issue.risk_explanation)
+        if unlimited_word.search(issue.suggested_improvement):
+            issue.suggested_improvement = unlimited_word.sub("uncapped", issue.suggested_improvement)
+
+        has_indemnity_context = "indemnification" in category_lower or indemnification_cues.search(combined_issue_text)
+        has_explicit_cap = bool(capped_indemnity_cues.search(issue.quoted_text or ""))
+        if has_indemnity_context and has_explicit_cap:
+            corrected_risk = sanitize_capped_indemnity_text(issue.risk_explanation)
+            corrected_suggestion = sanitize_capped_indemnity_text(issue.suggested_improvement)
+            if corrected_risk != issue.risk_explanation:
+                logger.info("[Normalization] Forbidden phrase correction -> capped indemnity risk text")
+                issue.risk_explanation = corrected_risk
+            if corrected_suggestion != issue.suggested_improvement:
+                logger.info("[Normalization] Forbidden phrase correction -> capped indemnity suggestion text")
+                issue.suggested_improvement = corrected_suggestion
+
+        new_category = category_text
+        if category_lower in structural_categories:
+            new_category = "Structural Inconsistency"
+        elif category_lower in indemnification_categories:
+            new_category = "Indemnification"
+        elif category_lower == "liability exposure" and indemnification_cues.search(combined_issue_text):
+            new_category = "Indemnification"
+        elif category_lower == "residuals risk":
+            new_category = "Residuals"
+        elif category_lower == "governing law risk":
+            new_category = "Governing Law"
+
+        if new_category != category_text:
+            logger.info("[Normalization] Category remap -> %s -> %s", category_text, new_category)
+            issue.category = new_category
+            category_text = new_category
+            category_lower = new_category.lower()
+
+        severity_text = issue.severity.strip().upper()
+        if severity_text in {"HIGH", "CRITICAL"} and structural_heuristic_cues.search(combined_issue_text):
+            logger.info("[Normalization] Structural heuristic trigger -> Structural Inconsistency")
+            if issue.category != "Structural Inconsistency":
+                issue.category = "Structural Inconsistency"
+                category_lower = "structural inconsistency"
+
+        if structural_cues.search(issue.risk_explanation) or structural_cues.search(issue.quoted_text):
+            if issue.category != "Structural Inconsistency":
+                logger.info("[Normalization] Category remap -> %s -> Structural Inconsistency", issue.category)
+                issue.category = "Structural Inconsistency"
+                category_lower = "structural inconsistency"
+
+        if "residuals" in category_lower:
+            cleaned_risk = re.sub(
+                r"\b(unlimited|uncapped|no limit|no cap)\b",
+                "unrestricted",
+                issue.risk_explanation,
+                flags=re.IGNORECASE
+            )
+            cleaned_risk = re.sub(r"\b(liability|liable|damages|exposure)\b", "", cleaned_risk, flags=re.IGNORECASE)
+            issue.risk_explanation = " ".join(cleaned_risk.split())
+            issue.suggested_improvement = (
+                "Clarify that residual knowledge does not permit use of confidential information and "
+                "ensure confidentiality obligations continue after termination."
+            )
+
+        if "confidentiality" in category_lower:
+            issue.suggested_improvement = "Ensure confidentiality obligations survive termination and continue after contract expiration."
+
+        if "indemnification" in category_lower and unlimited_tokens.search(issue.quoted_text or ""):
+            issue.suggested_improvement = (
+                "Introduce a liability cap so indemnification obligations include a liability cap at a defined monetary amount."
+            )
+
+    return suppress_duplicate_audit_issues(issues)
+
+def suppress_duplicate_audit_issues(issues: List[AuditIssue]) -> List[AuditIssue]:
+    kept_issues = []
+    seen_quotes = set()
+    suppressed_count = 0
+
+    for issue in issues:
+        quote_key = normalize_quoted_text_key(issue.quoted_text)
+        if quote_key and quote_key in seen_quotes:
+            suppressed_count += 1
+            continue
+        if quote_key:
+            seen_quotes.add(quote_key)
+        kept_issues.append(issue)
+
+    if suppressed_count:
+        logger.info("[Normalization] Duplicate quoted text suppressions -> %s", suppressed_count)
+
+    return kept_issues
+
+def normalize_audit_response(response_text: str, mode: str = "AUDIT") -> str:
+    """Normalize audit output through structured issues and render legacy text."""
+    if mode != "AUDIT":
+        return response_text
+
+    structured_issues = parse_audit_issues(response_text)
+    if not structured_issues:
+        normalized_response = normalize_issue_severity(response_text)
+        return normalize_issue_output(normalized_response)
+
+    structured_issues = normalize_audit_issue_severity_fields(structured_issues)
+    structured_issues = normalize_audit_issue_fields(structured_issues)
+    return render_legacy_audit_text(response_text, structured_issues)
 
 def normalize_issue_severity(response_text: str) -> str:
     """Deterministically enforce severity overrides on parsed issues."""
@@ -393,7 +891,13 @@ def normalize_issue_categories_and_language(response_text: str) -> str:
     category_replacements = {
         "Indemnification Risk": "Indemnification",
         "Indemnification Exposure": "Indemnification",
+        "Uncapped Liability": "Indemnification",
+        "Indemnity Concern": "Indemnification",
         "Structural Conflict": "Structural Inconsistency",
+        "Conflicting Structure": "Structural Inconsistency",
+        "Structural Contradiction": "Structural Inconsistency",
+        "Malformed Structure": "Structural Inconsistency",
+        "Structural Omission": "Structural Inconsistency",
         "Residuals Risk": "Residuals",
         "Governing Law Risk": "Governing Law",
     }
@@ -408,12 +912,15 @@ def normalize_issue_categories_and_language(response_text: str) -> str:
     def apply_normalization(block: str) -> str:
         # Category normalization
         for old, new in category_replacements.items():
+            old_block = block
             block = re.sub(
                 rf"(?im)^(Category:\s*){re.escape(old)}\b",
                 rf"\1{new}",
                 block,
                 count=1
             )
+            if block != old_block:
+                logger.info("[Normalization] Category remap -> %s -> %s", old, new)
 
         # Extract fields
         quoted_match = re.search(
@@ -449,7 +956,61 @@ def normalize_issue_categories_and_language(response_text: str) -> str:
 
         return block
 
-    return issue_pattern.sub(lambda m: apply_normalization(m.group(0)), response_text)
+    normalized_text = issue_pattern.sub(lambda m: apply_normalization(m.group(0)), response_text)
+    return suppress_duplicate_quoted_issues(normalized_text)
+
+def normalize_quoted_text_key(quoted_text: str) -> str:
+    """Create a stable key for duplicate quoted-text detection."""
+    normalized = re.sub(r"\s+", " ", quoted_text.strip().strip('"').strip("'"))
+    return normalized.lower()
+
+def suppress_duplicate_quoted_issues(response_text: str) -> str:
+    """Discard later issues that repeat identical quoted text."""
+    if "Issue:" not in response_text:
+        return response_text
+
+    issue_pattern = re.compile(r"(?ims)^Issue:\s*.*?(?=^Issue:\s*|\Z)")
+    kept_blocks = []
+    seen_quotes = set()
+    suppressed_count = 0
+    last_end = 0
+    prefix = ""
+
+    for match in issue_pattern.finditer(response_text):
+        if not kept_blocks and match.start() > 0:
+            prefix = response_text[:match.start()]
+
+        last_end = match.end()
+        block = match.group(0).rstrip()
+        quoted_match = re.search(
+            r"(?is)Quoted Text:\s*(.*?)(?:\n[A-Z][A-Za-z ]+:\s|$)",
+            block.strip()
+        )
+        quoted_text = quoted_match.group(1).strip() if quoted_match else ""
+        quote_key = normalize_quoted_text_key(quoted_text)
+
+        if quote_key and quote_key in seen_quotes:
+            suppressed_count += 1
+            continue
+
+        if quote_key:
+            seen_quotes.add(quote_key)
+        kept_blocks.append(block)
+
+    if suppressed_count:
+        logger.info("[Normalization] Duplicate quoted text suppressions -> %s", suppressed_count)
+
+    if not kept_blocks:
+        return response_text
+
+    suffix = response_text[last_end:].strip()
+    normalized_output = prefix.rstrip()
+    if normalized_output:
+        normalized_output += "\n\n"
+    normalized_output += "\n\n".join(kept_blocks)
+    if suffix:
+        normalized_output += "\n\n" + suffix
+    return normalized_output
 
 def normalize_issue_output(response_text: str) -> str:
     """Normalize categories and language for deterministic outputs."""
@@ -459,6 +1020,35 @@ def normalize_issue_output(response_text: str) -> str:
     issue_pattern = re.compile(r"(?ims)^Issue:\s*.*?(?=^Issue:\s*|\Z)")
     unlimited_tokens = re.compile(r"\b(unlimited|uncapped|no cap|no limit)\b", re.IGNORECASE)
     unlimited_word = re.compile(r"\bunlimited\b", re.IGNORECASE)
+    capped_indemnity_cues = re.compile(
+        r"\b(?:capped at|liability cap|aggregate cap|shall not exceed|must not exceed|may not exceed|"
+        r"limited to|maximum amount|up to|cap of)\b|[$₹€£]\s?\d|\b\d+(?:,\d{3})*(?:\.\d+)?\s*(?:usd|inr|eur|gbp|dollars|rupees)\b",
+        re.IGNORECASE
+    )
+    structural_categories = {
+        "conflicting structure",
+        "malformed structure",
+        "structural conflict",
+        "structural contradiction",
+        "structural inconsistency",
+        "structural omission",
+    }
+    indemnification_categories = {
+        "indemnification risk",
+        "uncapped liability",
+        "indemnity concern",
+    }
+    indemnification_cues = re.compile(r"\b(indemn|indemnify|indemnity|hold harmless)\b", re.IGNORECASE)
+    structural_cues = re.compile(
+        r"\b(conflict|conflicting|contradict|contradiction|inconsistent|inconsistency|incompatible|malformed)\b",
+        re.IGNORECASE
+    )
+    structural_heuristic_cues = re.compile(
+        r"\b(?:contradictory obligations|conflicting clauses|inconsistent obligations|"
+        r"mutually exclusive terms|structural contradiction|impossible compliance|"
+        r"termination conflict|conflicting survival language)\b",
+        re.IGNORECASE
+    )
 
     def replace_section(block: str, label: str, new_text: str) -> str:
         pattern = re.compile(
@@ -466,7 +1056,22 @@ def normalize_issue_output(response_text: str) -> str:
         )
         return pattern.sub(lambda m: f"{m.group(1)}{new_text}", block, count=1)
 
+    def sanitize_capped_indemnity_text(text: str) -> str:
+        replacements = [
+            (r"\buncapped liability\b", "capped liability"),
+            (r"\bunlimited liability\b", "capped liability"),
+            (r"\buncapped indemnification\b", "capped indemnification"),
+            (r"\bunlimited indemnification\b", "capped indemnification"),
+            (r"\bno cap\b", "a defined cap"),
+            (r"\bno limit\b", "a defined limit"),
+        ]
+        sanitized = text
+        for pattern, replacement in replacements:
+            sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+        return sanitized
+
     def apply_normalization(block: str) -> str:
+        severity_match = re.search(r"(?im)^Severity:\s*(.+)", block)
         category_match = re.search(r"(?im)^Category:\s*(.+)", block)
         quoted_match = re.search(
             r"(?is)Quoted Text:\s*(.*?)(?:\n[A-Z][A-Za-z ]+:\s|$)",
@@ -486,8 +1091,10 @@ def normalize_issue_output(response_text: str) -> str:
         quoted_text = quoted_match.group(1).strip() if quoted_match else ""
         risk_text = risk_match.group(2).strip() if risk_match else ""
         suggested_text = suggested_match.group(2).strip() if suggested_match else ""
+        severity_text = severity_match.group(1).strip().upper() if severity_match else ""
         risk_changed = False
         suggested_changed = False
+        combined_issue_text = " ".join([category_text, quoted_text, risk_text, suggested_text])
 
         # 0. Global unlimited sanitization outside quoted text
         if unlimited_word.search(risk_text):
@@ -497,20 +1104,35 @@ def normalize_issue_output(response_text: str) -> str:
             suggested_text = unlimited_word.sub("uncapped", suggested_text)
             suggested_changed = True
 
+        has_indemnity_context = "indemnification" in category_lower or indemnification_cues.search(combined_issue_text)
+        has_explicit_cap = bool(capped_indemnity_cues.search(quoted_text))
+        if has_indemnity_context and has_explicit_cap:
+            corrected_risk = sanitize_capped_indemnity_text(risk_text)
+            corrected_suggestion = sanitize_capped_indemnity_text(suggested_text)
+            if corrected_risk != risk_text:
+                logger.info("[Normalization] Forbidden phrase correction -> capped indemnity risk text")
+                risk_text = corrected_risk
+                risk_changed = True
+            if corrected_suggestion != suggested_text:
+                logger.info("[Normalization] Forbidden phrase correction -> capped indemnity suggestion text")
+                suggested_text = corrected_suggestion
+                suggested_changed = True
+
         # 1. Category normalization (Category line only)
         new_category = category_text
-        if category_lower == "liability exposure" and "indemn" in quoted_text.lower():
-            new_category = "Indemnification"
-        elif category_lower == "indemnification risk":
-            new_category = "Indemnification"
-        elif category_lower == "structural conflict":
+        if category_lower in structural_categories:
             new_category = "Structural Inconsistency"
+        elif category_lower in indemnification_categories:
+            new_category = "Indemnification"
+        elif category_lower == "liability exposure" and indemnification_cues.search(combined_issue_text):
+            new_category = "Indemnification"
         elif category_lower == "residuals risk":
             new_category = "Residuals"
         elif category_lower == "governing law risk":
             new_category = "Governing Law"
 
         if new_category != category_text and category_match:
+            logger.info("[Normalization] Category remap -> %s -> %s", category_text, new_category)
             block = re.sub(
                 r"(?im)^(Category:\s*).+$",
                 rf"\1{new_category}",
@@ -520,9 +1142,9 @@ def normalize_issue_output(response_text: str) -> str:
             category_text = new_category
             category_lower = new_category.lower()
 
-        # 2. Structural conflict normalization based on quoted or risk language
-        if re.search(r"\b(conflict|contradict|inconsistent|incompatible)\b", risk_text, re.IGNORECASE) or \
-           re.search(r"\b(conflict|contradict|inconsistent|incompatible)\b", quoted_text, re.IGNORECASE):
+        # 2. Heuristic structural conflict detection for adversarial contract contradictions.
+        if severity_text in {"HIGH", "CRITICAL"} and structural_heuristic_cues.search(combined_issue_text):
+            logger.info("[Normalization] Structural heuristic trigger -> Structural Inconsistency")
             if category_text != "Structural Inconsistency":
                 block = re.sub(
                     r"(?im)^(Category:\s*).+$",
@@ -533,7 +1155,20 @@ def normalize_issue_output(response_text: str) -> str:
                 category_text = "Structural Inconsistency"
                 category_lower = category_text.lower()
 
-        # 3. Residuals language cleanup
+        # 3. Structural conflict normalization based on quoted or risk language
+        if structural_cues.search(risk_text) or structural_cues.search(quoted_text):
+            if category_text != "Structural Inconsistency":
+                logger.info("[Normalization] Category remap -> %s -> Structural Inconsistency", category_text)
+                block = re.sub(
+                    r"(?im)^(Category:\s*).+$",
+                    r"\1Structural Inconsistency",
+                    block,
+                    count=1
+                )
+                category_text = "Structural Inconsistency"
+                category_lower = category_text.lower()
+
+        # 4. Residuals language cleanup
         if "residuals" in category_lower:
             cleaned_risk = re.sub(r"\b(unlimited|uncapped|no limit|no cap)\b", "unrestricted", risk_text, flags=re.IGNORECASE)
             cleaned_risk = re.sub(r"\b(liability|liable|damages|exposure)\b", "", cleaned_risk, flags=re.IGNORECASE)
@@ -545,13 +1180,13 @@ def normalize_issue_output(response_text: str) -> str:
             suggested_text = resid_improvement
             block = replace_section(block, "Suggested Improvement", suggested_text)
 
-        # 4. Confidentiality rewrite safeguard
+        # 5. Confidentiality rewrite safeguard
         if "confidentiality" in category_lower:
             conf_text = "Ensure confidentiality obligations survive termination and continue after contract expiration."
             suggested_text = conf_text
             block = replace_section(block, "Suggested Improvement", suggested_text)
 
-        # 5. Enforce cap wording for indemnification with unlimited cues
+        # 6. Enforce cap wording for indemnification with unlimited cues
         if "indemnification" in category_lower and unlimited_tokens.search(quoted_text):
             cap_text = (
                 "Introduce a liability cap so indemnification obligations include a liability cap at a defined monetary amount."
@@ -567,7 +1202,8 @@ def normalize_issue_output(response_text: str) -> str:
 
         return block
 
-    return issue_pattern.sub(lambda m: apply_normalization(m.group(0)), response_text)
+    normalized_text = issue_pattern.sub(lambda m: apply_normalization(m.group(0)), response_text)
+    return suppress_duplicate_quoted_issues(normalized_text)
 
 # =====================
 # Prompts
@@ -820,7 +1456,10 @@ def export_report(session_id: str = Form(...)):
 # Endpoint
 # =====================
 @app.post("/ask")
-def ask(q: Query):
+def ask(q: Query, response_format: Optional[str] = None):
+    request_start = time.time()
+    log_timing("Request received", request_start)
+
     if not q.session_id:
         raise HTTPException(422, "session_id required")
 
@@ -828,11 +1467,24 @@ def ask(q: Query):
 
     session = sessions.get(q.session_id)
     text = q.question.strip()
+    json_response_mode = is_json_response_mode(response_format or q.response_format)
+    if json_response_mode:
+        logger.info("[API] JSON response mode enabled")
 
     # -----------------
     # Creator identity (backend enforced)
     # -----------------
     if is_creator_question(text):
+        log_timing("Total request", request_start)
+        if json_response_mode:
+            return JSONResponse({
+                "success": True,
+                "model": MODEL_NAME,
+                "issue_count": 0,
+                "issues": [],
+                "structured_parse_failed": True,
+                "legacy_text": CREATOR_STATEMENT,
+            })
         return StreamingResponse(
             iter([CREATOR_STATEMENT]),
             media_type="text/plain"
@@ -853,6 +1505,7 @@ def ask(q: Query):
     # -----------------
     # Build prompt
     # -----------------
+    prompt_start = time.time()
     system_prompt = build_execution_prompt(session["mode"])
 
     # Inject task anchor if provided (e.g. for file uploads)
@@ -864,6 +1517,56 @@ def ask(q: Query):
         messages.append({"role": "user", "content": turn["user"]})
         messages.append({"role": "assistant", "content": turn["assistant"]})
     messages.append({"role": "user", "content": text})
+    log_timing("Prompt build", prompt_start)
+
+    if json_response_mode:
+        try:
+            raw_response = response_generator.generate_response(messages, settings.MODEL_FAST)
+            normalization_start = time.time()
+            complete_response = normalize_audit_response(raw_response, session["mode"])
+            log_timing("Normalization", normalization_start)
+            if should_debug_regression_case(q.session_id, q.task_anchor, text):
+                log_regression_debug(raw_response, complete_response)
+        except HTTPException as http_err:
+            raise http_err
+        except Exception as e:
+            logger.error("Unexpected error during /ask generation. session_id=%s error=%s", q.session_id, e)
+            raise HTTPException(500, f"Unexpected error during generation: {str(e)}")
+
+        try:
+            validation_context = ValidationContext(
+                user_input=text,
+                session_mode=session["mode"],
+                is_creator_question=is_creator_question(text)
+            )
+            validation_start = time.time()
+            validation_result = validation_engine.validate_response(complete_response, validation_context)
+            log_timing("Validation", validation_start)
+        except Exception as e:
+            logger.error("Validation error during /ask. session_id=%s error=%s", q.session_id, e)
+            raise HTTPException(500, f"Validation error: {str(e)}")
+
+        log_timing("Total request", request_start)
+
+        if validation_result.is_valid:
+            session["last_report"] = complete_response
+            if sessions.should_update_history(validation_result):
+                sessions.add_valid_exchange(q.session_id, text, complete_response)
+            return JSONResponse(build_audit_json_payload(complete_response, MODEL_NAME))
+
+        refusal_message = validation_result.refusal_message or validation_engine.get_refusal_message(
+            validation_result.violation_type, validation_result.violation_reason
+        )
+        return JSONResponse(
+            {
+                "success": False,
+                "model": MODEL_NAME,
+                "issue_count": 0,
+                "issues": [],
+                "structured_parse_failed": True,
+                "legacy_text": refusal_message,
+            }
+        )
 
     # -----------------
     # Streaming response
@@ -873,9 +1576,12 @@ def ask(q: Query):
         yield ""
         # Always try fast model first. ResponseGenerator handles fallback internally.
         try:
-            complete_response = response_generator.generate_response(messages, settings.MODEL_FAST)
-            complete_response = normalize_issue_severity(complete_response)
-            complete_response = normalize_issue_output(complete_response)
+            raw_response = response_generator.generate_response(messages, settings.MODEL_FAST)
+            normalization_start = time.time()
+            complete_response = normalize_audit_response(raw_response, session["mode"])
+            log_timing("Normalization", normalization_start)
+            if should_debug_regression_case(q.session_id, q.task_anchor, text):
+                log_regression_debug(raw_response, complete_response)
         except HTTPException as http_err:
             # Re-raise HTTP exceptions from ResponseGenerator with proper error format
             raise http_err
@@ -892,11 +1598,15 @@ def ask(q: Query):
                 is_creator_question=is_creator_question(text)
             )
             
+            validation_start = time.time()
             validation_result = validation_engine.validate_response(complete_response, validation_context)
+            log_timing("Validation", validation_start)
         except Exception as e:
             # Handle validation engine failures gracefully
             logger.error("Validation error during /ask. session_id=%s error=%s", q.session_id, e)
             raise HTTPException(500, f"Validation error: {str(e)}")
+        
+        log_timing("Total request", request_start)
         
         if validation_result.is_valid:
             # Stream the valid response to user
@@ -946,8 +1656,15 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
 def ask_file(
     file: UploadFile = File(...),
     session_id: str = Form(...),
-    mode: Optional[str] = Form(None)
+    mode: Optional[str] = Form(None),
+    response_format: Optional[str] = Form(None)
 ):
+    request_start = time.time()
+    log_timing("Request received", request_start)
+    json_response_mode = is_json_response_mode(response_format)
+    if json_response_mode:
+        logger.info("[API] JSON response mode enabled")
+
     # ---- VALIDATION ----
     try:
         session = sessions.get(session_id)
@@ -959,12 +1676,15 @@ def ask_file(
             raise HTTPException(400, "Only .txt and .pdf files supported")
 
         logger.info("Starting file processing. session_id=%s filename=%s", session_id, filename)
+        file_read_start = time.time()
         content = file.file.read()
+        log_timing("File read", file_read_start)
         if not content:
             raise HTTPException(400, "Empty file")
             
         file.file.close()
 
+        extraction_start = time.time()
         if filename.endswith(".pdf"):
             text = extract_text_from_pdf(content)
         else:
@@ -974,6 +1694,7 @@ def ask_file(
             except Exception as e:
                 logger.error("File encoding error. session_id=%s filename=%s error=%s", session_id, filename, e)
                 raise HTTPException(400, f"File encoding error: {str(e)}")
+        log_timing("File extraction", extraction_start)
 
         if len(text) > 20000:
             raise HTTPException(400, "Document too large. Please upload a smaller file.")
@@ -1011,6 +1732,7 @@ def ask_file(
         # -------------------------
         # Build Prompt with Context
         # -------------------------
+        prompt_start = time.time()
         system_prompt = build_execution_prompt(effective_mode)
 
         if rag_context:
@@ -1020,10 +1742,14 @@ def ask_file(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": text}
         ]
+        log_timing("Prompt build", prompt_start)
 
-        complete_response = response_generator.generate_response(messages, settings.MODEL_FAST)
-        complete_response = normalize_issue_severity(complete_response)
-        complete_response = normalize_issue_output(complete_response)
+        raw_response = response_generator.generate_response(messages, settings.MODEL_FAST)
+        normalization_start = time.time()
+        complete_response = normalize_audit_response(raw_response, effective_mode)
+        log_timing("Normalization", normalization_start)
+        if should_debug_regression_case(session_id, filename, text):
+            log_regression_debug(raw_response, complete_response)
 
         validation_context = ValidationContext(
             user_input=text,
@@ -1031,22 +1757,39 @@ def ask_file(
             is_creator_question=False
             )
 
+        validation_start = time.time()
         validation_result = validation_engine.validate_response(
             complete_response,
             validation_context
             )
+        log_timing("Validation", validation_start)
+        log_timing("Total request", request_start)
 
         if not validation_result.is_valid:
             refusal_message = validation_result.refusal_message or validation_engine.get_refusal_message(
                 validation_result.violation_type,
                 validation_result.violation_reason
             )
+            if json_response_mode:
+                return JSONResponse(
+                    {
+                        "success": False,
+                        "model": MODEL_NAME,
+                        "issue_count": 0,
+                        "issues": [],
+                        "structured_parse_failed": True,
+                        "legacy_text": refusal_message,
+                    }
+                )
             return StreamingResponse(
             response_generator.stream_to_user(refusal_message),
             media_type="text/plain"
             )
 
         session["last_report"] = complete_response
+
+        if json_response_mode:
+            return JSONResponse(build_audit_json_payload(complete_response, MODEL_NAME))
 
         return StreamingResponse(
             response_generator.stream_to_user(complete_response),

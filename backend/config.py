@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    MODEL_FAST: str = "gemma4:E4B"
+    MODEL_FAST: str = "qwen2.5:3b-instruct"
     MODEL_FALLBACK: str = "qwen2.5:7b-instruct"
 
     API_HOST: str = "0.0.0.0"
