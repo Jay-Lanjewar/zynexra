@@ -122,7 +122,7 @@ class DatabaseService:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            issues_json = json.dumps(issues) if isinstance(issues, dict) else str(issues)
+            issues_json = json.dumps(issues) if isinstance(issues, (dict, list)) else str(issues)
             
             cursor.execute("""
             INSERT INTO audit_history 
@@ -132,7 +132,8 @@ class DatabaseService:
             
             record_id = cursor.lastrowid
             conn.commit()
-            logger.debug(f"[DB] Audit record inserted: id={record_id}, filename={filename}")
+            logger.debug(f"[DB] Audit record inserted: id={record_id}, filename={filename}, mode={mode}")
+            logger.debug(f"[History] Record persisted -> mode={mode}, id={record_id}")
             return record_id
             
         except Exception as e:
@@ -219,7 +220,8 @@ class DatabaseService:
             
             record_id = cursor.lastrowid
             conn.commit()
-            logger.debug(f"[DB] Advisory record saved: session_id={session_id}")
+            logger.debug(f"[DB] Advisory record saved: session_id={session_id}, message_count={message_count}")
+            logger.debug(f"[History] Record persisted -> mode=ADVISORY, session_id={session_id}")
             return record_id
             
         except Exception as e:
@@ -256,6 +258,9 @@ class DatabaseService:
             query = "SELECT * FROM audit_history WHERE 1=1"
             params = []
             
+            # Exclude ADVISORY mode records from audit_history (they belong in advisory_sessions)
+            query += " AND mode != 'ADVISORY'"
+            
             if filename:
                 query += " AND filename LIKE ?"
                 params.append(f"%{filename}%")
@@ -280,12 +285,16 @@ class DatabaseService:
             
             results = []
             for row in rows:
+                try:
+                    issues = json.loads(row[4]) if row[4] else {}
+                except (json.JSONDecodeError, TypeError):
+                    issues = {}
                 results.append({
                     "id": row[0],
                     "filename": row[1],
                     "timestamp": row[2],
                     "issue_count": row[3],
-                    "issues": json.loads(row[4]) if row[4] else {},
+                    "issues": issues,
                     "raw_response": row[5],
                     "mode": row[6],
                     "severity_level": row[7]
@@ -397,6 +406,8 @@ class DatabaseService:
                     "message_count": row[5]
                 })
             
+            logger.debug(f"[DB] Retrieved {len(results)} advisory sessions")
+            logger.debug(f"[History] Workspace fetch -> mode=ADVISORY, count={len(results)}")
             return results
             
         except Exception as e:

@@ -337,22 +337,33 @@ def ask(q: Query, response_format: Optional[str] = None):
             if sessions.should_update_history(validation_result):
                 sessions.add_valid_exchange(q.session_id, text, complete_response)
             
-            # Persist audit to database
+            # Persist to database based on mode
             try:
                 if db_service.available:
-                    payload = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"])
-                    issue_count = payload.get("issue_count", 0)
-                    issues = payload.get("issues", [])
-                    db_service.insert_audit(
-                        filename="text_input",
-                        issue_count=issue_count,
-                        issues=issues,
-                        raw_response=complete_response,
-                        mode=session["mode"],
-                        severity_level="HIGH" if issue_count > 0 else "LOW"
-                    )
+                    if session["mode"] == "ADVISORY":
+                        messages = [{"role": "user", "content": turn["user"]} for turn in session["history"]]
+                        messages.extend([{"role": "assistant", "content": turn["assistant"]} for turn in session["history"]])
+                        db_service.insert_advisory(
+                            session_id=q.session_id,
+                            messages=messages,
+                            title=f"Advisory Session {q.session_id[:8]}"
+                        )
+                        logger.debug(f"[History] Saving record -> mode={session['mode']}, session_id={q.session_id}")
+                    else:
+                        payload = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"])
+                        issue_count = payload.get("issue_count", 0)
+                        issues = payload.get("issues", [])
+                        record_id = db_service.insert_audit(
+                            filename="text_input",
+                            issue_count=issue_count,
+                            issues=issues,
+                            raw_response=complete_response,
+                            mode=session["mode"],
+                            severity_level="HIGH" if issue_count > 0 else "LOW"
+                        )
+                        logger.debug(f"[History] Saving record -> mode={session['mode']}, id={record_id}")
             except Exception as e:
-                logger.warning(f"Failed to persist audit: {str(e)}")
+                logger.warning(f"Failed to persist history: {str(e)}")
             
             return JSONResponse(build_mode_json_payload(complete_response, MODEL_NAME, session["mode"]))
 
@@ -422,29 +433,39 @@ def ask(q: Query, response_format: Optional[str] = None):
                 if sessions.should_update_history(validation_result):
                     sessions.add_valid_exchange(q.session_id, text, final_response)
                 
-                # Persist audit/redaction to database
+                # Persist to database based on mode
                 try:
                     if db_service.available:
-                        payload = build_mode_json_payload(final_response, MODEL_NAME, session["mode"])
-                        if session["mode"] == "AUDIT":
-                            issue_count = payload.get("issue_count", 0)
-                            issues = payload.get("issues", [])
-                            db_service.insert_audit(
-                                filename="text_input",
-                                issue_count=issue_count,
-                                issues=issues,
-                                raw_response=final_response,
-                                mode=session["mode"],
-                                severity_level="HIGH" if issue_count > 0 else "LOW"
+                        if session["mode"] == "ADVISORY":
+                            messages = [{"role": "user", "content": turn["user"]} for turn in session["history"]]
+                            messages.extend([{"role": "assistant", "content": turn["assistant"]} for turn in session["history"]])
+                            record_id = db_service.insert_advisory(
+                                session_id=q.session_id,
+                                messages=messages,
+                                title=f"Advisory Session {q.session_id[:8]}"
                             )
-                        elif session["mode"] == "REDACTION":
-                            # Redaction entities would need to be extracted from complete_response
-                            db_service.insert_redaction(
-                                filename="text_input",
-                                redaction_count=0,
-                                entities={},
-                                redacted_text=final_response
-                            )
+                            logger.debug(f"[History] Saving record -> mode={session['mode']}, session_id={q.session_id}")
+                        else:
+                            payload = build_mode_json_payload(final_response, MODEL_NAME, session["mode"])
+                            if session["mode"] == "AUDIT":
+                                issue_count = payload.get("issue_count", 0)
+                                issues = payload.get("issues", [])
+                                record_id = db_service.insert_audit(
+                                    filename="text_input",
+                                    issue_count=issue_count,
+                                    issues=issues,
+                                    raw_response=final_response,
+                                    mode=session["mode"],
+                                    severity_level="HIGH" if issue_count > 0 else "LOW"
+                                )
+                                logger.debug(f"[History] Saving record -> mode={session['mode']}, id={record_id}")
+                            elif session["mode"] == "REDACTION":
+                                db_service.insert_redaction(
+                                    filename="text_input",
+                                    redaction_count=0,
+                                    entities={},
+                                    redacted_text=final_response
+                                )
                 except Exception as e:
                     logger.warning(f"Failed to persist response: {str(e)}")
             except Exception as e:
@@ -794,7 +815,8 @@ def get_history(
                 results["records"].extend(advisory)
         
         results["total"] = len(results["records"])
-        logger.debug(f"[API] Retrieved {results['total']} history records (type={record_type})")
+        logger.debug(f"[API] Retrieved {results['total']} history records (type={record_type}, mode_filter={mode})")
+        logger.debug(f"[History] Workspace fetch -> record_type={record_type}, mode_filter={mode}, total={results['total']}")
         return results
         
     except Exception as e:

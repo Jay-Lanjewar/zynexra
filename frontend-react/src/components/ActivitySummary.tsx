@@ -8,13 +8,13 @@ interface ActivitySummaryProps {
 
 function StatCard({ icon: Icon, label, count }: { icon: React.ReactNode; label: string; count: number }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
         {Icon}
       </div>
-      <div>
-        <p className="text-xs font-medium text-slate-600">{label}</p>
-        <p className="text-lg font-bold text-slate-900">{count}</p>
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-slate-600 truncate">{label}</p>
+        <p className="text-base sm:text-lg font-bold text-slate-900">{count}</p>
       </div>
     </div>
   );
@@ -31,8 +31,8 @@ export function ActivitySummary({ summary, isLoading = false, error = null }: Ac
 
   if (isLoading) {
     return (
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-100 p-6 animate-pulse">
-        <div className="grid grid-cols-3 gap-4">
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-100 p-4 sm:p-6 animate-pulse overflow-hidden">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="h-12 bg-slate-200 rounded"></div>
           ))}
@@ -44,9 +44,9 @@ export function ActivitySummary({ summary, isLoading = false, error = null }: Ac
   const stats = summary?.stats || { audits: 0, redactions: 0, advisory: 0, total: 0 };
 
   return (
-    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-100 p-6">
+    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-100 p-4 sm:p-6 overflow-hidden">
       <h3 className="text-sm font-semibold text-slate-900 mb-4">Activity Summary</h3>
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
         <StatCard
           icon={
             <svg
