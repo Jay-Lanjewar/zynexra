@@ -4,6 +4,9 @@ import type { ApiError } from "../api";
 type ErrorStateProps = {
   error: ApiError | string;
   onReset?: () => void;
+  onRetry?: () => void;
+  isRetrying?: boolean;
+  retryAttempt?: number;
 };
 
 export function ErrorState({ error, onReset }: ErrorStateProps) {
@@ -125,16 +128,29 @@ export function ErrorState({ error, onReset }: ErrorStateProps) {
       <h3 className={`mt-4 text-lg font-semibold ${titleColors[variant]}`}>{title}</h3>
       <p className={`mt-2 max-w-md text-sm ${messageColors[variant]}`}>{message}</p>
 
-      {onReset && (
-        <div className="mt-6 flex gap-3">
-          <button
-            type="button"
-            onClick={onReset}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Try Again
-          </button>
+      {(onReset || onRetry) && (
+        <div className="mt-6 flex gap-3 flex-wrap justify-center">
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={isRetrying}
+              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:bg-slate-400 transition-colors"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRetrying ? "animate-spin" : ""}`} />
+              {isRetrying ? "Retrying..." : "Retry"}
+            </button>
+          )}
+          {onReset && (
+            <button
+              type="button"
+              onClick={onReset}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Start Over
+            </button>
+          )}
         </div>
       )}
     </div>

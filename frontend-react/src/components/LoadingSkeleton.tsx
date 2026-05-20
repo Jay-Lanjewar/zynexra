@@ -38,3 +38,26 @@ export function SummarySkeleton() {
     </div>
   );
 }
+
+export function ChatMessageSkeleton() {
+  return (
+    <div className="flex gap-3 animate-pulse">
+      <div className="h-8 w-8 rounded-full bg-slate-200"></div>
+      <div className="flex-1 space-y-2">
+        <div className="h-4 bg-slate-200 rounded w-16"></div>
+        <div className="h-3 bg-slate-200 rounded w-3/4"></div>
+        <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+      </div>
+    </div>
+  );
+}
+
+export function TypingIndicator() {
+  return (
+    <div className="flex items-center gap-1 p-3" role="status" aria-label="Assistant is typing">
+      <span className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "0ms" }}></span>
+      <span className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "150ms" }}></span>
+      <span className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "300ms" }}></span>
+    </div>
+  );
+}

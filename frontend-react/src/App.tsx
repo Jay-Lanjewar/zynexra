@@ -1,16 +1,23 @@
-import { useState } from "react";
-import { askAdvisoryQuestion, auditContractFile, type ApiError } from "./api";
+import { useState, useEffect, useCallback } from "react";
+import { askAdvisoryQuestion, auditContractFile, type ApiError, getHistoryRecords } from "./api";
 import { AdvisoryChatPage } from "./pages/AdvisoryChatPage";
 import { AuditResultsPage } from "./pages/AuditResultsPage";
 import { RedactionResultsPage } from "./pages/RedactionResultsPage";
 import { UploadContractPage } from "./pages/UploadContractPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 import { TopNavigation } from "./components/TopNavigation";
+import { ToastProvider, useToast } from "./contexts/ToastContext";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { OfflineIndicator } from "./components/OfflineIndicator";
+import { RetryButton } from "./components/RetryButton";
+import { useConnection } from "./hooks/useConnection";
+import { persistence, type PersistedAppState, type PersistedAdvisory } from "./utils/persistence";
+import { logger, logApiError } from "./utils/logger";
 import type { AppMode, AuditResponse, ChatMessage, RedactionOptions, HistoryRecord } from "./types";
 
 type AppState = AppMode | "WORKSPACE";
 
-export default function App() {
+function AppContent() {
   const [appState, setAppState] = useState<AppState>("AUDIT");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [result, setResult] = useState<AuditResponse | null>(null);
@@ -26,11 +33,51 @@ export default function App() {
     addresses: true,
     companies: true,
   });
-  const [advisorySessionId] = useState(() => crypto.randomUUID());
+  const [advisorySessionId, setAdvisorySessionId] = useState(() => crypto.randomUUID());
   const [advisoryInput, setAdvisoryInput] = useState("");
   const [advisoryMessages, setAdvisoryMessages] = useState<ChatMessage[]>([]);
   const [advisoryError, setAdvisoryError] = useState<ApiError | null>(null);
   const [isAdvisoryLoading, setIsAdvisoryLoading] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [historyRetryAttempt, setHistoryRetryAttempt] = useState(0);
+  const { addToast } = useToast();
+  const connectionState = useConnection();
+
+  useEffect(() => {
+    const savedState = persistence.loadAppState();
+    if (savedState) {
+      setAppState(savedState.mode);
+      setSelectedMode(savedState.selectedMode);
+      setRedactionOptions(savedState.redactionOptions);
+    }
+  }, []);
+
+  useEffect(() => {
+    persistence.saveAppState({
+      mode: appState,
+      selectedMode,
+      redactionOptions,
+    });
+  }, [appState, selectedMode, redactionOptions]);
+
+  useEffect(() => {
+    if (appState === "ADVISORY") {
+      const savedAdvisory = persistence.loadAdvisoryState();
+      if (savedAdvisory) {
+        setAdvisorySessionId(savedAdvisory.sessionId);
+        setAdvisoryMessages(savedAdvisory.messages);
+      }
+    }
+  }, [appState]);
+
+  useEffect(() => {
+    if (appState === "ADVISORY" && advisoryMessages.length > 0) {
+      persistence.saveAdvisoryState({
+        sessionId: advisorySessionId,
+        messages: advisoryMessages,
+      });
+    }
+  }, [advisorySessionId, advisoryMessages, appState]);
 
   async function handleSubmit() {
     if (!selectedFile) {
@@ -42,8 +89,10 @@ export default function App() {
     setUploadProgress(0);
     setError(null);
     setApiError(null);
+    setRetryAttempt(0);
 
     try {
+      addToast("loading", `Processing ${selectedFile.name}...`);
       const auditResult = await auditContractFile(
         selectedFile,
         selectedMode as Exclude<AppMode, "ADVISORY">,
@@ -52,13 +101,46 @@ export default function App() {
       );
       setResult(auditResult);
       setAppState(selectedMode);
+      addToast("success", `${selectedMode} completed successfully`);
+      logger.info("File processed successfully", { mode: selectedMode, filename: selectedFile.name });
     } catch (caughtError) {
       const apiErr = caughtError as ApiError;
       setApiError(apiErr);
+      setRetryAttempt(1);
+      addToast("error", apiErr.message);
+      logApiError("/ask_file", apiErr, { mode: selectedMode, filename: selectedFile?.name });
     } finally {
       setIsLoading(false);
     }
   }
+
+  const handleRetry = useCallback(async () => {
+    if (!selectedFile || connectionState === "offline") return;
+    setRetryAttempt((prev) => prev + 1);
+    setIsLoading(true);
+    setUploadProgress(0);
+    setApiError(null);
+
+    try {
+      addToast("loading", `Retrying (attempt ${retryAttempt + 1})...`);
+      const auditResult = await auditContractFile(
+        selectedFile,
+        selectedMode as Exclude<AppMode, "ADVISORY">,
+        redactionOptions,
+        setUploadProgress
+      );
+      setResult(auditResult);
+      setAppState(selectedMode);
+      addToast("success", "Retry successful!");
+    } catch (caughtError) {
+      const apiErr = caughtError as ApiError;
+      setApiError(apiErr);
+      addToast("error", apiErr.message);
+      logApiError("/ask_file (retry)", apiErr, { attempt: retryAttempt + 1 });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedFile, selectedMode, redactionOptions, connectionState, retryAttempt, addToast]);
 
   function handleReset() {
     setResult(null);
@@ -67,9 +149,11 @@ export default function App() {
     setApiError(null);
     setUploadProgress(0);
     setAppState("AUDIT");
+    setRetryAttempt(0);
+    persistence.clearAppState();
   }
 
-  async function handleAdvisorySend() {
+  async function handleAdvisorySend(retried = false) {
     const question = advisoryInput.trim();
     if (!question || isAdvisoryLoading) return;
 
@@ -87,6 +171,7 @@ export default function App() {
     setIsAdvisoryLoading(true);
 
     try {
+      addToast("loading", "Getting response...");
       const response = await askAdvisoryQuestion(question, advisorySessionId, historyBeforeSend);
       const assistantText = response.advisory_text || response.legacy_text || "";
       const genericGreeting = /^(hello|hi|welcome|how can i help|how may i assist)[\s!.?,]*$/i.test(assistantText.trim());
@@ -100,12 +185,20 @@ export default function App() {
         createdAt: new Date().toISOString(),
       };
       setAdvisoryMessages((messages) => [...messages, assistantMessage]);
+      addToast("success", "Response received");
     } catch (caughtError) {
-      setAdvisoryError(caughtError as ApiError);
+      const apiErr = caughtError as ApiError;
+      setAdvisoryError(apiErr);
+      addToast("error", apiErr.message);
+      logApiError("/ask (advisory)", apiErr, { retried });
     } finally {
       setIsAdvisoryLoading(false);
     }
   }
+
+  const handleAdvisoryRetry = useCallback(() => {
+    handleAdvisorySend(true);
+  }, []);
 
   function handleModeChange(mode: AppMode | "WORKSPACE") {
     if (mode !== "WORKSPACE") {
@@ -147,6 +240,8 @@ export default function App() {
           onInputChange={setAdvisoryInput}
           onSend={handleAdvisorySend}
           onModeChange={handleModeChange}
+          onRetry={advisoryError ? handleAdvisoryRetry : undefined}
+          isRetrying={isAdvisoryLoading}
         />
       </div>
     );
@@ -175,6 +270,17 @@ export default function App() {
           error={apiError}
           onReset={handleReset}
         />
+        {apiError && (
+          <div className="fixed bottom-4 left-4 z-40">
+            <RetryButton
+              onRetry={handleRetry}
+              isRetrying={isLoading}
+              attempt={retryAttempt}
+              maxAttempts={3}
+              label="Retry Upload"
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -200,5 +306,16 @@ export default function App() {
         onSubmit={handleSubmit}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <ToastProvider>
+        <OfflineIndicator />
+        <AppContent />
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }

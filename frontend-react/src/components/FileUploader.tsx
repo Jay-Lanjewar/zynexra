@@ -84,6 +84,16 @@ export function FileUploader({
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
+        onKeyDown={(e) => {
+          if ((e.key === "Enter" || e.key === " ") && !isUploading) {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
+        role="button"
+        tabIndex={isUploading ? -1 : 0}
+        aria-label={selectedFile ? `File selected: ${selectedFile.name}. Press to change.` : "Upload file. Click or drag and drop."}
+        aria-describedby={displayError ? "file-error" : undefined}
         className={`
           relative cursor-pointer rounded-lg border-2 border-dashed bg-white p-8 text-center transition-all
           ${isDragOver
@@ -91,6 +101,7 @@ export function FileUploader({
             : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"
           }
           ${isUploading ? "cursor-wait opacity-60" : ""}
+          focus-visible:focus-ring
         `}
       >
         <input
@@ -100,6 +111,7 @@ export function FileUploader({
           className="sr-only"
           onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
           disabled={isUploading}
+          aria-label="Select file to upload"
         />
 
         {selectedFile ? (
@@ -159,8 +171,8 @@ export function FileUploader({
       )}
 
       {displayError && (
-        <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+        <div id="file-error" role="alert" className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
           {displayError}
         </div>
       )}

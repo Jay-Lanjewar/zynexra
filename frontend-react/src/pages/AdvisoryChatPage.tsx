@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
-import { ArrowUp, Loader2, MessageSquareText, ShieldCheck } from "lucide-react";
+import { ArrowUp, Loader2, MessageSquareText, ShieldCheck, RefreshCw } from "lucide-react";
 import type { AppMode, ChatMessage } from "../types";
 import type { ApiError } from "../api";
+import { RetryButton } from "../components/RetryButton";
 
 type AdvisoryChatPageProps = {
   messages: ChatMessage[];
@@ -12,6 +13,9 @@ type AdvisoryChatPageProps = {
   onInputChange: (value: string) => void;
   onSend: () => void;
   onModeChange: (mode: AppMode | "WORKSPACE") => void;
+  onRetry?: () => void;
+  isRetrying?: boolean;
+  retryAttempt?: number;
 };
 
 export function AdvisoryChatPage({
@@ -23,6 +27,9 @@ export function AdvisoryChatPage({
   onInputChange,
   onSend,
   onModeChange,
+  onRetry,
+  isRetrying = false,
+  retryAttempt = 0,
 }: AdvisoryChatPageProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -102,8 +109,18 @@ export function AdvisoryChatPage({
           </div>
 
           {error ? (
-            <div className="border-t border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              {error.message}
+            <div className="border-t border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-sm text-amber-800 mb-2">{error.message}</p>
+              {onRetry && (
+                <RetryButton
+                  onRetry={onRetry}
+                  isRetrying={isRetrying}
+                  attempt={retryAttempt}
+                  maxAttempts={3}
+                  label="Retry"
+                  className="justify-start"
+                />
+              )}
             </div>
           ) : null}
 
