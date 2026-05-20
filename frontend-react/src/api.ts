@@ -18,6 +18,7 @@ export type HistoryRecord = {
   severity?: string;
   preview?: string;
   record_type?: "audit" | "redaction" | "advisory";
+  issues?: Record<string, unknown>[];
 };
 
 export type HistoryResponse = {

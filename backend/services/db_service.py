@@ -5,10 +5,141 @@ Handles SQLite operations with graceful degradation if database is unavailable.
 
 import sqlite3
 import json
+import ast
 import os
 from datetime import datetime
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Tuple
 from backend.logger import logger
+
+# Global repair counters for migration reporting
+_audit_repair_count = 0
+_redaction_repair_count = 0
+_advisory_repair_count = 0
+
+
+def parse_legacy_json(json_str: str, record_id: int, table_name: str, 
+                       db_path: str, auto_repair: bool = True) -> Tuple[Any, bool]:
+    """Parse JSON with legacy str(list/dict) fallback and optional auto-repair.
+    
+    Args:
+        json_str: The JSON string to parse
+        record_id: ID of the record for logging
+        table_name: Table name for repair operation
+        db_path: Database path for auto-repair
+        auto_repair: Whether to auto-repair the JSON in DB
+        
+    Returns:
+        Tuple of (parsed_data, was_repaired)
+    """
+    global _audit_repair_count
+    
+    if not json_str:
+        return {}, False
+    
+    try:
+        parsed = json.loads(json_str)
+        return parsed, False
+    except (json.JSONDecodeError, TypeError):
+        pass
+    
+    logger.warning(f"[DB] Legacy malformed JSON detected -> record_id={record_id}")
+    
+    try:
+        parsed = ast.literal_eval(json_str)
+        
+        if auto_repair:
+            repaired_json = json.dumps(parsed)
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute(f"UPDATE {table_name} SET issues_json = ? WHERE id = ?", 
+                          (repaired_json, record_id))
+            conn.commit()
+            conn.close()
+            logger.info(f"[DB] Legacy JSON repaired -> record_id={record_id}")
+            logger.info(f"[DB] Record upgraded to valid JSON")
+            _audit_repair_count += 1
+        
+        return parsed, True
+        
+    except (ValueError, SyntaxError, TypeError) as e:
+        logger.error(f"[DB] Failed to parse legacy JSON -> record_id={record_id}, error={str(e)}")
+        return {}, False
+
+
+def parse_legacy_entities_json(json_str: str, record_id: int, db_path: str, 
+                                auto_repair: bool = True) -> Tuple[Any, bool]:
+    """Parse entities JSON with legacy fallback for redaction records."""
+    global _redaction_repair_count
+    
+    if not json_str:
+        return {}, False
+    
+    try:
+        parsed = json.loads(json_str)
+        return parsed, False
+    except (json.JSONDecodeError, TypeError):
+        pass
+    
+    logger.warning(f"[DB] Legacy malformed JSON detected -> redaction_id={record_id}")
+    
+    try:
+        parsed = ast.literal_eval(json_str)
+        
+        if auto_repair:
+            repaired_json = json.dumps(parsed)
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("UPDATE redaction_history SET entities_json = ? WHERE id = ?", 
+                          (repaired_json, record_id))
+            conn.commit()
+            conn.close()
+            logger.info(f"[DB] Legacy JSON repaired -> redaction_id={record_id}")
+            logger.info(f"[DB] Redaction record upgraded to valid JSON")
+            _redaction_repair_count += 1
+        
+        return parsed, True
+        
+    except (ValueError, SyntaxError, TypeError) as e:
+        logger.error(f"[DB] Failed to parse legacy JSON -> redaction_id={record_id}, error={str(e)}")
+        return {}, False
+
+
+def parse_legacy_messages_json(json_str: str, record_id: int, db_path: str,
+                                auto_repair: bool = True) -> Tuple[Any, bool]:
+    """Parse messages JSON with legacy fallback for advisory records."""
+    global _advisory_repair_count
+    
+    if not json_str:
+        return [], False
+    
+    try:
+        parsed = json.loads(json_str)
+        return parsed, False
+    except (json.JSONDecodeError, TypeError):
+        pass
+    
+    logger.warning(f"[DB] Legacy malformed JSON detected -> advisory_id={record_id}")
+    
+    try:
+        parsed = ast.literal_eval(json_str)
+        
+        if auto_repair:
+            repaired_json = json.dumps(parsed)
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("UPDATE advisory_sessions SET messages_json = ? WHERE id = ?", 
+                          (repaired_json, record_id))
+            conn.commit()
+            conn.close()
+            logger.info(f"[DB] Legacy JSON repaired -> advisory_id={record_id}")
+            logger.info(f"[DB] Advisory record upgraded to valid JSON")
+            _advisory_repair_count += 1
+        
+        return parsed, True
+        
+    except (ValueError, SyntaxError, TypeError) as e:
+        logger.error(f"[DB] Failed to parse legacy JSON -> advisory_id={record_id}, error={str(e)}")
+        return [], False
 
 
 class DatabaseService:
@@ -285,10 +416,11 @@ class DatabaseService:
             
             results = []
             for row in rows:
-                try:
-                    issues = json.loads(row[4]) if row[4] else {}
-                except (json.JSONDecodeError, TypeError):
-                    issues = {}
+                issues, repaired = parse_legacy_json(
+                    row[4], row[0], "audit_history", self.db_path
+                )
+                if repaired:
+                    logger.debug(f"[History] Legacy repair applied -> id={row[0]}")
                 results.append({
                     "id": row[0],
                     "filename": row[1],
@@ -351,12 +483,15 @@ class DatabaseService:
             
             results = []
             for row in rows:
+                entities, repaired = parse_legacy_entities_json(row[4], row[0], self.db_path)
+                if repaired:
+                    logger.debug(f"[History] Legacy repair applied -> redaction_id={row[0]}")
                 results.append({
                     "id": row[0],
                     "filename": row[1],
                     "timestamp": row[2],
                     "redaction_count": row[3],
-                    "entities": json.loads(row[4]) if row[4] else {},
+                    "entities": entities,
                     "redacted_text": row[5],
                     "redaction_types": row[6]
                 })
@@ -397,11 +532,14 @@ class DatabaseService:
             
             results = []
             for row in rows:
+                messages, repaired = parse_legacy_messages_json(row[3], row[0], self.db_path)
+                if repaired:
+                    logger.debug(f"[History] Legacy repair applied -> advisory_id={row[0]}")
                 results.append({
                     "id": row[0],
                     "session_id": row[1],
                     "title": row[2],
-                    "messages": json.loads(row[3]) if row[3] else [],
+                    "messages": messages,
                     "timestamp": row[4],
                     "message_count": row[5]
                 })
@@ -437,12 +575,15 @@ class DatabaseService:
                 cursor.execute("SELECT * FROM audit_history WHERE id = ?", (record_id,))
                 row = cursor.fetchone()
                 if row:
+                    issues, repaired = parse_legacy_json(row[4], row[0], "audit_history", self.db_path)
+                    if repaired:
+                        logger.debug(f"[History] Legacy repair on reopen -> id={row[0]}")
                     return {
                         "id": row[0],
                         "filename": row[1],
                         "timestamp": row[2],
                         "issue_count": row[3],
-                        "issues": json.loads(row[4]) if row[4] else {},
+                        "issues": issues,
                         "raw_response": row[5],
                         "mode": row[6],
                         "severity_level": row[7]
@@ -451,12 +592,15 @@ class DatabaseService:
                 cursor.execute("SELECT * FROM redaction_history WHERE id = ?", (record_id,))
                 row = cursor.fetchone()
                 if row:
+                    entities, repaired = parse_legacy_entities_json(row[4], row[0], self.db_path)
+                    if repaired:
+                        logger.debug(f"[History] Legacy repair on reopen -> redaction_id={row[0]}")
                     return {
                         "id": row[0],
                         "filename": row[1],
                         "timestamp": row[2],
                         "redaction_count": row[3],
-                        "entities": json.loads(row[4]) if row[4] else {},
+                        "entities": entities,
                         "redacted_text": row[5],
                         "redaction_types": row[6]
                     }
@@ -464,11 +608,14 @@ class DatabaseService:
                 cursor.execute("SELECT * FROM advisory_sessions WHERE id = ?", (record_id,))
                 row = cursor.fetchone()
                 if row:
+                    messages, repaired = parse_legacy_messages_json(row[3], row[0], self.db_path)
+                    if repaired:
+                        logger.debug(f"[History] Legacy repair on reopen -> advisory_id={row[0]}")
                     return {
                         "id": row[0],
                         "session_id": row[1],
                         "title": row[2],
-                        "messages": json.loads(row[3]) if row[3] else [],
+                        "messages": messages,
                         "timestamp": row[4],
                         "message_count": row[5]
                     }
@@ -534,21 +681,18 @@ class DatabaseService:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            # Delete old audit records
             cursor.execute("""
             DELETE FROM audit_history
             WHERE timestamp < datetime('now', '-' || ? || ' days')
             """, (days_old,))
             audit_deleted = cursor.rowcount
             
-            # Delete old redaction records
             cursor.execute("""
             DELETE FROM redaction_history
             WHERE timestamp < datetime('now', '-' || ? || ' days')
             """, (days_old,))
             redaction_deleted = cursor.rowcount
             
-            # Delete old advisory records
             cursor.execute("""
             DELETE FROM advisory_sessions
             WHERE timestamp < datetime('now', '-' || ? || ' days')
@@ -565,7 +709,127 @@ class DatabaseService:
             return 0
         finally:
             conn.close()
+    
+    def scan_and_repair_legacy(self) -> Dict[str, int]:
+        """Proactively scan all records and repair any legacy malformed JSON.
+        
+        Returns:
+            Dictionary with counts of repaired records by type
+        """
+        global _audit_repair_count, _redaction_repair_count, _advisory_repair_count
+        
+        if not self.available:
+            return {"audit": 0, "redaction": 0, "advisory": 0}
+        
+        repaired = {"audit": 0, "redaction": 0, "advisory": 0}
+        
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Scan audit_history for malformed JSON
+            cursor.execute("SELECT id, issues_json FROM audit_history")
+            for row in cursor.fetchall():
+                record_id, issues_json = row
+                if issues_json and not self._is_valid_json(issues_json):
+                    try:
+                        parsed = ast.literal_eval(issues_json)
+                        repaired_json = json.dumps(parsed)
+                        cursor.execute(
+                            "UPDATE audit_history SET issues_json = ? WHERE id = ?",
+                            (repaired_json, record_id)
+                        )
+                        repaired["audit"] += 1
+                        logger.info(f"[DB] Legacy JSON repaired -> record_id={record_id}")
+                    except (ValueError, SyntaxError, TypeError):
+                        pass
+            
+            # Scan redaction_history for malformed JSON
+            cursor.execute("SELECT id, entities_json FROM redaction_history")
+            for row in cursor.fetchall():
+                record_id, entities_json = row
+                if entities_json and not self._is_valid_json(entities_json):
+                    try:
+                        parsed = ast.literal_eval(entities_json)
+                        repaired_json = json.dumps(parsed)
+                        cursor.execute(
+                            "UPDATE redaction_history SET entities_json = ? WHERE id = ?",
+                            (repaired_json, record_id)
+                        )
+                        repaired["redaction"] += 1
+                        logger.info(f"[DB] Legacy JSON repaired -> redaction_id={record_id}")
+                    except (ValueError, SyntaxError, TypeError):
+                        pass
+            
+            # Scan advisory_sessions for malformed JSON
+            cursor.execute("SELECT id, messages_json FROM advisory_sessions")
+            for row in cursor.fetchall():
+                record_id, messages_json = row
+                if messages_json and not self._is_valid_json(messages_json):
+                    try:
+                        parsed = ast.literal_eval(messages_json)
+                        repaired_json = json.dumps(parsed)
+                        cursor.execute(
+                            "UPDATE advisory_sessions SET messages_json = ? WHERE id = ?",
+                            (repaired_json, record_id)
+                        )
+                        repaired["advisory"] += 1
+                        logger.info(f"[DB] Legacy JSON repaired -> advisory_id={record_id}")
+                    except (ValueError, SyntaxError, TypeError):
+                        pass
+            
+            conn.commit()
+            
+            total = sum(repaired.values())
+            if total > 0:
+                logger.info(f"[DB] Legacy migration complete: {total} records repaired")
+                logger.info(f"[DB]   - Audit records: {repaired['audit']}")
+                logger.info(f"[DB]   - Redaction records: {repaired['redaction']}")
+                logger.info(f"[DB]   - Advisory records: {repaired['advisory']}")
+            else:
+                logger.info("[DB] Legacy scan complete: no malformed JSON found")
+            
+            return repaired
+            
+        except Exception as e:
+            logger.error(f"[DB] Legacy scan failed: {str(e)}")
+            return repaired
+        finally:
+            conn.close()
+    
+    def _is_valid_json(self, json_str: str) -> bool:
+        """Check if a string is valid JSON."""
+        try:
+            json.loads(json_str)
+            return True
+        except (json.JSONDecodeError, TypeError):
+            return False
+    
+    def get_repair_counts(self) -> Dict[str, int]:
+        """Get the number of records repaired during this session."""
+        global _audit_repair_count, _redaction_repair_count, _advisory_repair_count
+        return {
+            "audit": _audit_repair_count,
+            "redaction": _redaction_repair_count,
+            "advisory": _advisory_repair_count,
+            "total": _audit_repair_count + _redaction_repair_count + _advisory_repair_count
+        }
+
+
+def get_repair_counts() -> Dict[str, int]:
+    """Get the number of records repaired during this session."""
+    global _audit_repair_count, _redaction_repair_count, _advisory_repair_count
+    return {
+        "audit": _audit_repair_count,
+        "redaction": _redaction_repair_count,
+        "advisory": _advisory_repair_count,
+        "total": _audit_repair_count + _redaction_repair_count + _advisory_repair_count
+    }
 
 
 # Global instance
 db_service = DatabaseService()
+
+# Run legacy migration on startup if database is available
+if db_service.available:
+    db_service.scan_and_repair_legacy()

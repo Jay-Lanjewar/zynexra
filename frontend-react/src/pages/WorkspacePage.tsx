@@ -120,12 +120,39 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
       const detail = await getRecordDetail(record.id, recordType || "audit");
 
       if (detail.success && detail.record) {
+        const rawIssues = detail.record.issues || [];
+        console.log("[Workspace] Reopened audit payload:", detail.record);
+        console.log("[Workspace] Raw issues from API:", rawIssues);
+        
+        const issues = rawIssues.map((issue: Record<string, unknown>) => {
+          const normalized = {
+            issue_title: String(issue.issue_title || issue.title || ""),
+            severity: String(issue.severity || "UNKNOWN"),
+            category: String(issue.category || "General"),
+            location: String(issue.location || "Unknown"),
+            quoted_text: String(issue.quoted_text || issue.text || ""),
+            risk_explanation: String(issue.risk_explanation || ""),
+            suggested_improvement: String(issue.suggested_improvement || ""),
+          };
+          return normalized;
+        });
+        
+        if (rawIssues.length === 0 && record.issue_count && record.issue_count > 0) {
+          console.warn("[Workspace] Defensive fallback: issue_count > 0 but issues empty", {
+            recordId: record.id,
+            issueCount: record.issue_count,
+            issuesFound: rawIssues.length
+          });
+        }
+        
+        console.log("[Workspace] Normalized issues count ->", issues.length);
+        
         const auditResponse: AuditResponse = {
           success: true,
           model: "claude",
           mode: (record.mode?.toUpperCase() as AppMode) || "AUDIT",
-          issue_count: record.issue_count || 0,
-          issues: [],
+          issue_count: issues.length || record.issue_count || 0,
+          issues,
           redaction_count: record.redaction_count,
           redaction_entities: [],
           original_text: "",
