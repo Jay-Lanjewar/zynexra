@@ -15,12 +15,39 @@ export type HistoryRecord = {
   issue_count?: number;
   redaction_count?: number;
   title?: string;
+  severity?: string;
+  preview?: string;
+  record_type?: "audit" | "redaction" | "advisory";
 };
 
 export type HistoryResponse = {
   success: boolean;
   records: HistoryRecord[];
   total: number;
+  limit?: number;
+  offset?: number;
+  message?: string;
+};
+
+export type HistoryFilter = {
+  recordType?: "all" | "audit" | "redaction" | "advisory";
+  filename?: string;
+  mode?: string;
+  severity?: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export type HistorySummary = {
+  success: boolean;
+  stats: {
+    audits: number;
+    redactions: number;
+    advisory: number;
+    total: number;
+  };
   message?: string;
 };
 
@@ -233,4 +260,129 @@ export function validateFile(file: File): ApiError | null {
   }
 
   return null;
+}
+
+export async function getHistoryRecords(filter: HistoryFilter = {}): Promise<HistoryResponse> {
+  try {
+    const params = new URLSearchParams();
+    
+    if (filter.recordType) params.append("record_type", filter.recordType);
+    if (filter.limit) params.append("limit", String(filter.limit));
+    if (filter.offset) params.append("offset", String(filter.offset));
+    if (filter.filename) params.append("filename", filter.filename);
+    if (filter.mode) params.append("mode", filter.mode);
+    if (filter.severity) params.append("severity", filter.severity);
+    if (filter.startDate) params.append("start_date", filter.startDate);
+    if (filter.endDate) params.append("end_date", filter.endDate);
+
+    const response = await fetch(`${API_BASE_URL}/history?${params.toString()}`);
+    
+    if (!response.ok) {
+      throw { code: "SERVER_ERROR", message: `Failed to fetch history: ${response.status}` } as ApiError;
+    }
+
+    const data = await response.json() as HistoryResponse;
+    return data;
+  } catch (error) {
+    console.error("[API] History fetch error:", error);
+    
+    if ((error as ApiError).code) {
+      throw error;
+    }
+
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw { code: "NETWORK_ERROR", message: "Unable to connect to the backend. Please verify the server is running." } as ApiError;
+    }
+
+    throw { code: "SERVER_ERROR", message: "Failed to fetch history records." } as ApiError;
+  }
+}
+
+export async function getRecordDetail(
+  recordId: number,
+  recordType: "audit" | "redaction" | "advisory" = "audit"
+): Promise<{ success: boolean; record: HistoryRecord }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/history/${recordId}?record_type=${recordType}`);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw { code: "SERVER_ERROR", message: "Record not found." } as ApiError;
+      }
+      throw { code: "SERVER_ERROR", message: `Failed to fetch record: ${response.status}` } as ApiError;
+    }
+
+    const data = await response.json() as { success: boolean; record: HistoryRecord };
+    return data;
+  } catch (error) {
+    console.error("[API] Record detail fetch error:", error);
+    
+    if ((error as ApiError).code) {
+      throw error;
+    }
+
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw { code: "NETWORK_ERROR", message: "Unable to connect to the backend." } as ApiError;
+    }
+
+    throw { code: "SERVER_ERROR", message: "Failed to fetch record details." } as ApiError;
+  }
+}
+
+export async function deleteRecord(
+  recordId: number,
+  recordType: "audit" | "redaction" | "advisory" = "audit"
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/history/${recordId}?record_type=${recordType}`, {
+      method: "DELETE",
+    });
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw { code: "SERVER_ERROR", message: "Record not found." } as ApiError;
+      }
+      throw { code: "SERVER_ERROR", message: `Failed to delete record: ${response.status}` } as ApiError;
+    }
+
+    const data = await response.json() as { success: boolean; message: string };
+    return data;
+  } catch (error) {
+    console.error("[API] Record delete error:", error);
+    
+    if ((error as ApiError).code) {
+      throw error;
+    }
+
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw { code: "NETWORK_ERROR", message: "Unable to connect to the backend." } as ApiError;
+    }
+
+    throw { code: "SERVER_ERROR", message: "Failed to delete record." } as ApiError;
+  }
+}
+
+export async function getHistorySummary(): Promise<HistorySummary> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/history/stats/summary`);
+    
+    if (!response.ok) {
+      throw { code: "SERVER_ERROR", message: `Failed to fetch summary: ${response.status}` } as ApiError;
+    }
+
+    const data = await response.json() as HistorySummary;
+    return data;
+  } catch (error) {
+    console.error("[API] Summary fetch error:", error);
+    
+    if ((error as ApiError).code) {
+      throw error;
+    }
+
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw { code: "NETWORK_ERROR", message: "Unable to connect to the backend." } as ApiError;
+    }
+
+    throw { code: "SERVER_ERROR", message: "Failed to fetch summary." } as ApiError;
+  }
 }

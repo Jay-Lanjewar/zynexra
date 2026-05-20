@@ -9,6 +9,19 @@ export type ChatMessage = {
   createdAt: string;
 };
 
+export type HistoryRecord = {
+  id: number;
+  filename: string;
+  timestamp: string;
+  mode?: string;
+  issue_count?: number;
+  redaction_count?: number;
+  title?: string;
+  severity?: string;
+  preview?: string;
+  record_type?: "audit" | "redaction" | "advisory";
+};
+
 export type AuditIssue = {
   issue_title: string;
   severity: string;

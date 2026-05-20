@@ -4,9 +4,14 @@ import { AdvisoryChatPage } from "./pages/AdvisoryChatPage";
 import { AuditResultsPage } from "./pages/AuditResultsPage";
 import { RedactionResultsPage } from "./pages/RedactionResultsPage";
 import { UploadContractPage } from "./pages/UploadContractPage";
-import type { AppMode, AuditResponse, ChatMessage, RedactionOptions } from "./types";
+import { WorkspacePage } from "./pages/WorkspacePage";
+import { TopNavigation } from "./components/TopNavigation";
+import type { AppMode, AuditResponse, ChatMessage, RedactionOptions, HistoryRecord } from "./types";
+
+type AppState = AppMode | "WORKSPACE";
 
 export default function App() {
+  const [appState, setAppState] = useState<AppState>("AUDIT");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [result, setResult] = useState<AuditResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +51,7 @@ export default function App() {
         setUploadProgress
       );
       setResult(auditResult);
+      setAppState(selectedMode);
     } catch (caughtError) {
       const apiErr = caughtError as ApiError;
       setApiError(apiErr);
@@ -60,6 +66,7 @@ export default function App() {
     setError(null);
     setApiError(null);
     setUploadProgress(0);
+    setAppState("AUDIT");
   }
 
   async function handleAdvisorySend() {
@@ -100,64 +107,98 @@ export default function App() {
     }
   }
 
-  function handleModeChange(mode: AppMode) {
-    setSelectedMode(mode);
+  function handleModeChange(mode: AppMode | "WORKSPACE") {
+    if (mode !== "WORKSPACE") {
+      setSelectedMode(mode as AppMode);
+    }
     setResult(null);
     setError(null);
     setApiError(null);
     setAdvisoryError(null);
+    setAppState(mode);
   }
 
-  if (selectedMode === "ADVISORY") {
+  function handleRecordOpen(record: HistoryRecord, result: AuditResponse) {
+    setResult(result);
+    setAppState(result.mode || "AUDIT");
+  }
+
+  // Workspace view
+  if (appState === "WORKSPACE") {
     return (
-      <AdvisoryChatPage
-        messages={advisoryMessages}
-        inputValue={advisoryInput}
-        isLoading={isAdvisoryLoading}
-        error={advisoryError}
-        sessionId={advisorySessionId}
-        onInputChange={setAdvisoryInput}
-        onSend={handleAdvisorySend}
+      <WorkspacePage
         onModeChange={handleModeChange}
+        onRecordOpen={handleRecordOpen}
       />
     );
   }
 
+  // Advisory view
+  if (appState === "ADVISORY") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <TopNavigation currentMode="ADVISORY" onModeChange={handleModeChange} />
+        <AdvisoryChatPage
+          messages={advisoryMessages}
+          inputValue={advisoryInput}
+          isLoading={isAdvisoryLoading}
+          error={advisoryError}
+          sessionId={advisorySessionId}
+          onInputChange={setAdvisoryInput}
+          onSend={handleAdvisorySend}
+          onModeChange={handleModeChange}
+        />
+      </div>
+    );
+  }
+
+  // Redaction results view
   if (result?.mode === "REDACTION") {
     return (
-      <RedactionResultsPage
-        result={result}
-        onReset={handleReset}
-      />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <TopNavigation currentMode="REDACTION" onModeChange={handleModeChange} />
+        <RedactionResultsPage
+          result={result}
+          onReset={handleReset}
+        />
+      </div>
     );
   }
 
+  // Audit results view
   if (result || apiError) {
     return (
-      <AuditResultsPage
-        result={result}
-        error={apiError}
-        onReset={handleReset}
-      />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <TopNavigation currentMode={result?.mode || "AUDIT"} onModeChange={handleModeChange} />
+        <AuditResultsPage
+          result={result}
+          error={apiError}
+          onReset={handleReset}
+        />
+      </div>
     );
   }
 
+  // Upload/main view
   return (
-    <UploadContractPage
-      error={error}
-      isLoading={isLoading}
-      selectedFile={selectedFile}
-      uploadProgress={uploadProgress}
-      selectedMode={selectedMode}
-      redactionOptions={redactionOptions}
-      onFileChange={(file) => {
-        setSelectedFile(file);
-        setError(null);
-        setApiError(null);
-      }}
-      onModeChange={handleModeChange}
-      onRedactionOptionsChange={setRedactionOptions}
-      onSubmit={handleSubmit}
-    />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <TopNavigation currentMode="AUDIT" onModeChange={handleModeChange} />
+      <UploadContractPage
+        error={error}
+        isLoading={isLoading}
+        selectedFile={selectedFile}
+        uploadProgress={uploadProgress}
+        selectedMode={selectedMode}
+        redactionOptions={redactionOptions}
+        onFileChange={(file) => {
+          setSelectedFile(file);
+          setError(null);
+          setApiError(null);
+        }}
+        onModeChange={handleModeChange}
+        onRedactionOptionsChange={setRedactionOptions}
+        onSubmit={handleSubmit}
+      />
+    </div>
   );
 }

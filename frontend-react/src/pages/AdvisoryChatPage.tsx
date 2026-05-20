@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { ElementType } from "react";
-import { ArrowUp, Eraser, FileSearch, Info, Loader2, MessageSquareText, ShieldCheck } from "lucide-react";
+import { ArrowUp, Loader2, MessageSquareText, ShieldCheck } from "lucide-react";
 import type { AppMode, ChatMessage } from "../types";
 import type { ApiError } from "../api";
 
@@ -12,34 +11,8 @@ type AdvisoryChatPageProps = {
   sessionId: string;
   onInputChange: (value: string) => void;
   onSend: () => void;
-  onModeChange: (mode: AppMode) => void;
+  onModeChange: (mode: AppMode | "WORKSPACE") => void;
 };
-
-const modeActions: Array<{
-  value: AppMode;
-  label: string;
-  description: string;
-  icon: ElementType;
-}> = [
-  {
-    value: "AUDIT",
-    label: "Audit",
-    description: "Structured contract risk dashboard",
-    icon: FileSearch,
-  },
-  {
-    value: "REDACTION",
-    label: "Redaction",
-    description: "Document redaction view",
-    icon: Eraser,
-  },
-  {
-    value: "ADVISORY",
-    label: "Advisory",
-    description: "Conversational legal guidance",
-    icon: MessageSquareText,
-  },
-];
 
 export function AdvisoryChatPage({
   messages,
@@ -71,8 +44,8 @@ export function AdvisoryChatPage({
     <main className="mx-auto flex h-screen w-full max-w-6xl flex-col px-5 py-6 sm:px-8">
       <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Zynexra</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950">Advisory Chat</h1>
+          <h1 className="text-3xl font-semibold text-slate-950">Advisory Chat</h1>
+          <p className="mt-1 text-sm text-slate-600">Ask legal-practice questions</p>
         </div>
         <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
           <ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden="true" />
@@ -80,41 +53,7 @@ export function AdvisoryChatPage({
         </div>
       </header>
 
-      <section className="grid min-h-0 flex-1 gap-6 py-5 lg:grid-cols-[15rem_1fr]">
-        <aside className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm lg:self-start">
-          <div className="mb-2 flex items-center gap-2 px-1 text-sm font-semibold text-slate-800">
-            Mode
-            <Info className="h-4 w-4 text-slate-400" aria-hidden="true" />
-          </div>
-          <div className="grid gap-2">
-            {modeActions.map((mode) => {
-              const Icon = mode.icon;
-              const isSelected = mode.value === "ADVISORY";
-              return (
-                <button
-                  key={mode.value}
-                  type="button"
-                  onClick={() => onModeChange(mode.value)}
-                  title={mode.description}
-                  className={`rounded-md px-3 py-2 text-left transition ${
-                    isSelected
-                      ? "bg-slate-950 text-white"
-                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  <span className="flex items-center gap-2 text-sm font-semibold">
-                    <Icon className="h-4 w-4" aria-hidden="true" />
-                    {mode.label}
-                  </span>
-                  <span className={`mt-1 block text-xs leading-5 ${isSelected ? "text-slate-200" : "text-slate-500"}`}>
-                    {mode.description}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </aside>
-
+<section className="grid min-h-0 flex-1 gap-6 py-5">
         <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
             {messages.length === 0 ? (
