@@ -19,7 +19,16 @@ export type AuditIssue = {
   suggested_improvement: string;
 };
 
-export type RedactionEntityType = "PERSON" | "EMAIL" | "PHONE" | "ADDRESS" | "COMPANY" | "MONEY" | "DATE" | "ID_NUMBER";
+export type RedactionEntityType =
+  | "PERSON"
+  | "EMAIL"
+  | "PHONE"
+  | "ADDRESS"
+  | "COMPANY"
+  | "LOCATION"
+  | "MONEY"
+  | "DATE"
+  | "ID_NUMBER";
 
 export type RedactionEntity = {
   entity_type: RedactionEntityType;
