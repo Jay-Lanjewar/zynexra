@@ -1,4 +1,4 @@
-import type { AppMode, AuditResponse, ChatMessage, RedactionOptions } from "./types";
+import type { AppMode, AuditResponse, ChatMessage, RedactionOptions, ConfidenceLabel, ConfidenceMetadata } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -19,6 +19,10 @@ export type HistoryRecord = {
   preview?: string;
   record_type?: "audit" | "redaction" | "advisory";
   issues?: Record<string, unknown>[];
+  confidence_score?: number;
+  confidence_label?: ConfidenceLabel;
+  fallback_used?: boolean;
+  metadata?: ConfidenceMetadata;
 };
 
 export type HistoryResponse = {
@@ -302,7 +306,7 @@ export async function getHistoryRecords(filter: HistoryFilter = {}): Promise<His
 export async function getRecordDetail(
   recordId: number,
   recordType: "audit" | "redaction" | "advisory" = "audit"
-): Promise<{ success: boolean; record: HistoryRecord }> {
+): Promise<{ success: boolean; record: HistoryRecord; response?: AuditResponse }> {
   try {
     const response = await fetch(`${API_BASE_URL}/history/${recordId}?record_type=${recordType}`);
     
@@ -313,7 +317,7 @@ export async function getRecordDetail(
       throw { code: "SERVER_ERROR", message: `Failed to fetch record: ${response.status}` } as ApiError;
     }
 
-    const data = await response.json() as { success: boolean; record: HistoryRecord };
+    const data = await response.json() as { success: boolean; record: HistoryRecord; response?: AuditResponse };
     return data;
   } catch (error) {
     console.error("[API] Record detail fetch error:", error);

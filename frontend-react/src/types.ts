@@ -7,6 +7,8 @@ export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  confidence_score?: number;
+  confidence_label?: ConfidenceLabel;
 };
 
 export type HistoryRecord = {
@@ -20,6 +22,17 @@ export type HistoryRecord = {
   severity?: string;
   preview?: string;
   record_type?: "audit" | "redaction" | "advisory";
+};
+
+export type ConfidenceLabel = "HIGH" | "MEDIUM" | "LOW";
+
+export type ConfidenceMetadata = {
+  confidence_score: number;
+  confidence_label: ConfidenceLabel;
+  fallback_used?: boolean;
+  model_name?: string;
+  inference_duration_ms?: number;
+  parser_used?: string;
 };
 
 export type AuditIssue = {
@@ -75,6 +88,9 @@ export type AuditResponse = {
   redaction_entities?: RedactionEntity[];
   redaction_count?: number;
   fallback_used?: boolean;
+  confidence_score?: number;
+  confidence_label?: ConfidenceLabel;
+  metadata?: ConfidenceMetadata;
 };
 
 export type CategoryGroup = {

@@ -35,13 +35,17 @@ MODEL_NAME = settings.MODEL_FAST
 
 
 class OllamaService:
-    def generate_response(self, messages: list, model: str, mode: str = "AUDIT") -> str:
+    def generate_response(self, messages: list, model: str, mode: str = "AUDIT") -> tuple[str, bool]:
         try:
-            return self._generate_with_model(messages, model, mode)
+            result = self._generate_with_model(messages, model, mode), False
+            logger.info("[FallbackTrace] stage=ollama_service_success fallback_used=False")
+            return result
         except HTTPException as e:
             if self._should_fallback(e):
                 logger.warning("Model fallback activated. Switching to %s", settings.MODEL_FALLBACK)
-                return self._generate_with_model(messages, settings.MODEL_FALLBACK, mode)
+                result = self._generate_with_model(messages, settings.MODEL_FALLBACK, mode), True
+                logger.warning("[FallbackTrace] stage=ollama_service_fallback fallback_used=True")
+                return result
             raise
 
     def _should_fallback(self, error: HTTPException) -> bool:

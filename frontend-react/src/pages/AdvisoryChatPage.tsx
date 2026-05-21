@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
-import { ArrowUp, Loader2, MessageSquareText, ShieldCheck, RefreshCw } from "lucide-react";
+import { ArrowUp, Loader2, MessageSquareText, ShieldCheck, RefreshCw, AlertTriangle } from "lucide-react";
 import type { AppMode, ChatMessage } from "../types";
 import type { ApiError } from "../api";
 import { RetryButton } from "../components/RetryButton";
+import { ConfidenceBadge } from "../components/ConfidenceBadge";
 
 type AdvisoryChatPageProps = {
   messages: ChatMessage[];
@@ -77,6 +78,7 @@ export function AdvisoryChatPage({
               <div className="space-y-4">
                 {messages.map((message) => {
                   const isUser = message.role === "user";
+                  const isLastAssistant = !isUser && message === messages.filter((m) => m.role === "assistant").slice(-1)[0];
                   return (
                     <div key={message.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                       <div
@@ -86,14 +88,36 @@ export function AdvisoryChatPage({
                             : "border border-slate-200 bg-slate-50 text-slate-800"
                         }`}
                       >
-                        <div className={`mb-1 text-xs font-semibold ${isUser ? "text-slate-300" : "text-slate-500"}`}>
-                          {isUser ? "You" : "Zynexra"}
+                        <div className={`mb-1 flex items-center justify-between gap-2 text-xs font-semibold ${isUser ? "text-slate-300" : "text-slate-500"}`}>
+                          <span>{isUser ? "You" : "Zynexra"}</span>
+                          {!isUser && message.confidence_label && (
+                            <ConfidenceBadge
+                              confidence={message.confidence_score}
+                              label={message.confidence_label}
+                              showPercentage={false}
+                            />
+                          )}
                         </div>
                         <div className="whitespace-pre-wrap break-words">{message.content}</div>
                       </div>
                     </div>
                   );
                 })}
+                {messages.some((m) => m.role === "assistant" && m.confidence_label === "LOW") && (
+                  <div className="flex justify-start">
+                    <div className="max-w-[82%] rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm shadow-sm">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-600 mt-0.5" />
+                        <div>
+                          <p className="font-semibold text-red-800">Low Confidence Response</p>
+                          <p className="mt-0.5 text-red-700">
+                            This response may be incomplete or unreliable. Review carefully.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {isLoading ? (
                   <div className="flex justify-start">
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 shadow-sm">

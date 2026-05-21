@@ -183,6 +183,8 @@ function AppContent() {
           ? "The backend returned a generic greeting instead of answering the supplied advisory question."
           : assistantText || "The backend returned an empty advisory response.",
         createdAt: new Date().toISOString(),
+        confidence_score: response.confidence_score,
+        confidence_label: response.confidence_label,
       };
       setAdvisoryMessages((messages) => [...messages, assistantMessage]);
       addToast("success", "Response received");

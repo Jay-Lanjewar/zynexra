@@ -14,9 +14,20 @@ from backend.engines.normalization_engine import (
     normalize_audit_response,
     should_debug_regression_case,
 )
+from backend.engines.confidence_engine import audit_scorer, advisory_scorer
 from backend.engines.redaction_engine import RedactionEngine, parse_redaction_options
 from backend.engines.response_generator import ResponseGenerator
 from backend.engines.validation_engine import ValidationContext, ValidationEngine, ValidationResult
+from backend.engines.response_schemas import (
+    build_audit_response,
+    build_redaction_response,
+    build_advisory_response,
+    build_refusal_response,
+    convert_history_record_to_response,
+    get_legacy_text_for_export,
+    validate_response,
+    SCHEMA_VERSION,
+)
 from backend.logger import logger
 from backend.prompts import build_execution_prompt
 from backend.services.pdf_service import extract_text_from_pdf
@@ -152,16 +163,47 @@ def get_mode(session_id: str):
     return {"mode": session["mode"]}
 
 @app.post("/export_report")
-def export_report(session_id: str = Form(...)):
+def export_report(session_id: str = Form(...), response_format: Optional[str] = Form(None)):
     session = sessions.get(session_id)
 
     report_text = session.get("last_report")
+    structured_response = session.get("last_structured_response")
 
-    if not report_text:
+    if not report_text and not structured_response:
         raise HTTPException(400, "No report available to export.")
 
+    if response_format and response_format.lower() == "json":
+        if structured_response:
+            logger.info("[Schema] Export returning validated JSON response")
+            return JSONResponse(structured_response)
+
+        logger.warning("[Schema] No structured response available for export, building from raw text")
+        mode = session.get("mode", "AUDIT")
+        if mode == "AUDIT":
+            from backend.engines.normalization_engine import parse_audit_issues
+            issues = parse_audit_issues(report_text or "")
+            structured = build_audit_response(
+                complete_response=report_text or "",
+                model=MODEL_NAME,
+                issues=[issue.to_dict() for issue in issues] if issues else [],
+                structured_parse_failed=not issues
+            )
+        elif mode == "REDACTION":
+            structured = build_redaction_response(
+                model=MODEL_NAME,
+                original_text=report_text or "",
+                redacted_text=report_text or ""
+            )
+        else:
+            structured = build_advisory_response(
+                complete_response=report_text or "",
+                model=MODEL_NAME
+            )
+        validate_response(structured, mode)
+        return JSONResponse(structured)
+
     return Response(
-        content=report_text,
+        content=report_text or "",
         media_type="text/plain",
         headers={
             "Content-Disposition": "attachment; filename=zynexra_report.txt"
@@ -193,14 +235,10 @@ def ask(q: Query, response_format: Optional[str] = None):
     if is_creator_question(text):
         log_timing("Total request", request_start)
         if json_response_mode:
-            return JSONResponse({
-                "success": True,
-                "model": MODEL_NAME,
-                "issue_count": 0,
-                "issues": [],
-                "structured_parse_failed": True,
-                "legacy_text": CREATOR_STATEMENT,
-            })
+            return JSONResponse(build_advisory_response(
+                complete_response=CREATOR_STATEMENT,
+                model=MODEL_NAME
+            ))
         return StreamingResponse(
             iter([CREATOR_STATEMENT]),
             media_type="text/plain"
@@ -242,9 +280,11 @@ def ask(q: Query, response_format: Optional[str] = None):
 
         if validation_result.is_valid:
             session["last_report"] = complete_response
+            structured = redaction_result.to_payload(MODEL_NAME)
+            session["last_structured_response"] = structured
             if sessions.should_update_history(validation_result):
                 sessions.add_valid_exchange(q.session_id, text, complete_response)
-            
+
             # Persist redaction to database
             try:
                 if db_service.available:
@@ -259,9 +299,11 @@ def ask(q: Query, response_format: Optional[str] = None):
                     )
             except Exception as e:
                 logger.warning(f"Failed to persist redaction: {str(e)}")
-            
+
             if json_response_mode:
-                return JSONResponse(redaction_result.to_payload(MODEL_NAME))
+                if not validate_response(structured, "REDACTION"):
+                    logger.warning("[Schema] Redaction response validation failed during fresh execution")
+                return JSONResponse(structured)
             return StreamingResponse(
                 response_generator.stream_to_user(complete_response),
                 media_type="text/plain"
@@ -271,16 +313,7 @@ def ask(q: Query, response_format: Optional[str] = None):
             validation_result.violation_type, validation_result.violation_reason
         )
         if json_response_mode:
-            return JSONResponse(
-                {
-                    "success": False,
-                    "model": MODEL_NAME,
-                    "issue_count": 0,
-                    "issues": [],
-                    "structured_parse_failed": True,
-                    "legacy_text": refusal_message,
-                }
-            )
+            return JSONResponse(build_refusal_response(refusal_message, MODEL_NAME, "REDACTION"))
         return StreamingResponse(
             response_generator.stream_to_user(refusal_message),
             media_type="text/plain"
@@ -305,7 +338,8 @@ def ask(q: Query, response_format: Optional[str] = None):
 
     if json_response_mode:
         try:
-            raw_response = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
+            raw_response, fallback_used = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
+            logger.info("[FallbackTrace] stage=app_json_response_handoff fallback_used=%s", fallback_used)
             normalization_start = time.time()
             complete_response = normalize_audit_response(raw_response, session["mode"])
             log_timing("Normalization", normalization_start)
@@ -334,9 +368,18 @@ def ask(q: Query, response_format: Optional[str] = None):
 
         if validation_result.is_valid:
             session["last_report"] = complete_response
+            logger.info("[FallbackTrace] stage=app_build_audit_payload fallback_used=%s", fallback_used)
+            structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used)
+            if fallback_used:
+                structured["fallback_used"] = True
+                if "metadata" in structured:
+                    structured["metadata"]["fallback_used"] = True
+            session["last_structured_response"] = structured
+            if not validate_response(structured, session["mode"]):
+                logger.warning(f"[Schema] {session['mode']} response validation failed during fresh execution")
             if sessions.should_update_history(validation_result):
                 sessions.add_valid_exchange(q.session_id, text, complete_response)
-            
+
             # Persist to database based on mode
             try:
                 if db_service.available:
@@ -350,7 +393,7 @@ def ask(q: Query, response_format: Optional[str] = None):
                         )
                         logger.debug(f"[History] Saving record -> mode={session['mode']}, session_id={q.session_id}")
                     else:
-                        payload = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"])
+                        payload = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used)
                         issue_count = payload.get("issue_count", 0)
                         issues = payload.get("issues", [])
                         record_id = db_service.insert_audit(
@@ -364,22 +407,13 @@ def ask(q: Query, response_format: Optional[str] = None):
                         logger.debug(f"[History] Saving record -> mode={session['mode']}, id={record_id}")
             except Exception as e:
                 logger.warning(f"Failed to persist history: {str(e)}")
-            
-            return JSONResponse(build_mode_json_payload(complete_response, MODEL_NAME, session["mode"]))
+
+            return JSONResponse(structured)
 
         refusal_message = validation_result.refusal_message or validation_engine.get_refusal_message(
             validation_result.violation_type, validation_result.violation_reason
         )
-        return JSONResponse(
-            {
-                "success": False,
-                "model": MODEL_NAME,
-                "issue_count": 0,
-                "issues": [],
-                "structured_parse_failed": True,
-                "legacy_text": refusal_message,
-            }
-        )
+        return JSONResponse(build_refusal_response(refusal_message, MODEL_NAME, session["mode"]))
 
     # -----------------
     # Streaming response
@@ -389,7 +423,8 @@ def ask(q: Query, response_format: Optional[str] = None):
         yield ""
         # Always try fast model first. ResponseGenerator handles fallback internally.
         try:
-            raw_response = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
+            raw_response, fallback_used = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
+            logger.info("[FallbackTrace] stage=app_streaming_response_handoff fallback_used=%s", fallback_used)
             normalization_start = time.time()
             complete_response = normalize_audit_response(raw_response, session["mode"])
             log_timing("Normalization", normalization_start)
@@ -428,7 +463,16 @@ def ask(q: Query, response_format: Optional[str] = None):
                     yield char
                 final_response = complete_response
                 session["last_report"] = complete_response
-                
+                logger.info("[FallbackTrace] stage=app_streaming_build_payload fallback_used=%s", fallback_used)
+                structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used)
+                if fallback_used:
+                    structured["fallback_used"] = True
+                    if "metadata" in structured:
+                        structured["metadata"]["fallback_used"] = True
+                session["last_structured_response"] = structured
+                if not validate_response(structured, session["mode"]):
+                    logger.warning(f"[Schema] {session['mode']} response validation failed during streaming")
+
                 # Only store valid responses in conversation history using SessionManager
                 if sessions.should_update_history(validation_result):
                     sessions.add_valid_exchange(q.session_id, text, final_response)
@@ -446,7 +490,7 @@ def ask(q: Query, response_format: Optional[str] = None):
                             )
                             logger.debug(f"[History] Saving record -> mode={session['mode']}, session_id={q.session_id}")
                         else:
-                            payload = build_mode_json_payload(final_response, MODEL_NAME, session["mode"])
+                            payload = build_mode_json_payload(final_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used)
                             if session["mode"] == "AUDIT":
                                 issue_count = payload.get("issue_count", 0)
                                 issues = payload.get("issues", [])
@@ -587,16 +631,7 @@ def ask_file(
                     validation_result.violation_reason
                 )
                 if json_response_mode:
-                    return JSONResponse(
-                        {
-                            "success": False,
-                            "model": MODEL_NAME,
-                            "issue_count": 0,
-                            "issues": [],
-                            "structured_parse_failed": True,
-                            "legacy_text": refusal_message,
-                        }
-                    )
+                    return JSONResponse(build_refusal_response(refusal_message, MODEL_NAME, "REDACTION"))
                 return StreamingResponse(
                     response_generator.stream_to_user(refusal_message),
                     media_type="text/plain"
@@ -604,6 +639,8 @@ def ask_file(
 
             session["last_report"] = complete_response
             if json_response_mode:
+                structured = redaction_result.to_payload(MODEL_NAME)
+                session["last_structured_response"] = structured
                 # Persist redaction to database
                 try:
                     if db_service.available:
@@ -618,8 +655,10 @@ def ask_file(
                         )
                 except Exception as e:
                     logger.warning(f"Failed to persist redaction: {str(e)}")
-                
-                return JSONResponse(redaction_result.to_payload(MODEL_NAME))
+
+                if not validate_response(structured, "REDACTION"):
+                    logger.warning("[Schema] Redaction response validation failed in ask_file")
+                return JSONResponse(structured)
             return StreamingResponse(
                 response_generator.stream_to_user(complete_response),
                 media_type="text/plain"
@@ -655,7 +694,8 @@ def ask_file(
         ]
         log_timing("Prompt build", prompt_start)
 
-        raw_response = response_generator.generate_response(messages, settings.MODEL_FAST, effective_mode)
+        raw_response, fallback_used = response_generator.generate_response(messages, settings.MODEL_FAST, effective_mode)
+        logger.info("[FallbackTrace] stage=app_file_upload_handoff fallback_used=%s", fallback_used)
         normalization_start = time.time()
         complete_response = normalize_audit_response(raw_response, effective_mode)
         log_timing("Normalization", normalization_start)
@@ -682,16 +722,7 @@ def ask_file(
                 validation_result.violation_reason
             )
             if json_response_mode:
-                return JSONResponse(
-                    {
-                        "success": False,
-                        "model": MODEL_NAME,
-                        "issue_count": 0,
-                        "issues": [],
-                        "structured_parse_failed": True,
-                        "legacy_text": refusal_message,
-                    }
-                )
+                return JSONResponse(build_refusal_response(refusal_message, MODEL_NAME, effective_mode))
             return StreamingResponse(
             response_generator.stream_to_user(refusal_message),
             media_type="text/plain"
@@ -700,10 +731,16 @@ def ask_file(
         session["last_report"] = complete_response
 
         if json_response_mode:
+            structured = build_mode_json_payload(complete_response, MODEL_NAME, effective_mode, user_query=text, fallback_used=fallback_used)
+            if fallback_used:
+                structured["fallback_used"] = True
+                if "metadata" in structured:
+                    structured["metadata"]["fallback_used"] = True
+            session["last_structured_response"] = structured
             # Persist audit to database
             try:
                 if db_service.available:
-                    payload = build_mode_json_payload(complete_response, MODEL_NAME, effective_mode)
+                    payload = build_mode_json_payload(complete_response, MODEL_NAME, effective_mode, user_query=text, fallback_used=fallback_used)
                     issue_count = payload.get("issue_count", 0)
                     issues = payload.get("issues", [])
                     db_service.insert_audit(
@@ -717,7 +754,7 @@ def ask_file(
             except Exception as e:
                 logger.warning(f"Failed to persist audit: {str(e)}")
             
-            return JSONResponse(build_mode_json_payload(complete_response, MODEL_NAME, effective_mode))
+            return JSONResponse(build_mode_json_payload(complete_response, MODEL_NAME, effective_mode, user_query=text, fallback_used=fallback_used))
 
         return StreamingResponse(
             response_generator.stream_to_user(complete_response),
@@ -767,17 +804,19 @@ def get_history(
             "success": False,
             "message": "Database not available",
             "records": [],
-            "total": 0
+            "total": 0,
+            "schema_version": SCHEMA_VERSION
         }
-    
+
     results = {
         "success": True,
         "records": [],
         "total": 0,
         "limit": limit,
-        "offset": offset
+        "offset": offset,
+        "schema_version": SCHEMA_VERSION
     }
-    
+
     try:
         if record_type in ["audit", "all"]:
             audits = db_service.get_audit_history(
@@ -789,11 +828,24 @@ def get_history(
                 start_date=start_date,
                 end_date=end_date
             )
+            standardized_audits = []
+            for audit in audits:
+                standardized_audits.append({
+                    "id": audit.get("id"),
+                    "filename": audit.get("filename"),
+                    "timestamp": audit.get("timestamp"),
+                    "response": build_audit_response(
+                        complete_response=audit.get("raw_response", ""),
+                        model=MODEL_NAME,
+                        issues=audit.get("issues", []),
+                        structured_parse_failed=not audit.get("issues")
+                    )
+                })
             if record_type == "audit":
-                results["records"] = audits
+                results["records"] = standardized_audits
             else:
-                results["records"].extend(audits)
-        
+                results["records"].extend(standardized_audits)
+
         if record_type in ["redaction", "all"]:
             redactions = db_service.get_redaction_history(
                 limit=limit,
@@ -802,23 +854,57 @@ def get_history(
                 start_date=start_date,
                 end_date=end_date
             )
+            standardized_redactions = []
+            for redaction in redactions:
+                entities_list = list(redaction.get("entities", {}).values()) if redaction.get("entities") else []
+                standardized_redactions.append({
+                    "id": redaction.get("id"),
+                    "filename": redaction.get("filename"),
+                    "timestamp": redaction.get("timestamp"),
+                    "response": build_redaction_response(
+                        model=MODEL_NAME,
+                        original_text=redaction.get("redacted_text", ""),
+                        redacted_text=redaction.get("redacted_text", ""),
+                        redaction_entities=entities_list,
+                        fallback_used=False
+                    )
+                })
             if record_type == "redaction":
-                results["records"] = redactions
+                results["records"] = standardized_redactions
             else:
-                results["records"].extend(redactions)
-        
+                results["records"].extend(standardized_redactions)
+
         if record_type in ["advisory", "all"]:
             advisory = db_service.get_advisory_history(limit=limit, offset=offset)
+            standardized_advisory = []
+            for adv in advisory:
+                messages = adv.get("messages", [])
+                advisory_text = ""
+                if isinstance(messages, list):
+                    advisory_text = "\n".join(
+                        f"User: {m.get('user', '')}\nAssistant: {m.get('assistant', '')}"
+                        for m in messages if isinstance(m, dict)
+                    )
+                standardized_advisory.append({
+                    "id": adv.get("id"),
+                    "session_id": adv.get("session_id"),
+                    "title": adv.get("title"),
+                    "timestamp": adv.get("timestamp"),
+                    "response": build_advisory_response(
+                        complete_response=advisory_text,
+                        model=MODEL_NAME
+                    )
+                })
             if record_type == "advisory":
-                results["records"] = advisory
+                results["records"] = standardized_advisory
             else:
-                results["records"].extend(advisory)
-        
+                results["records"].extend(standardized_advisory)
+
         results["total"] = len(results["records"])
         logger.debug(f"[API] Retrieved {results['total']} history records (type={record_type}, mode_filter={mode})")
         logger.debug(f"[History] Workspace fetch -> record_type={record_type}, mode_filter={mode}, total={results['total']}")
         return results
-        
+
     except Exception as e:
         logger.error(f"[API] Error retrieving history: {str(e)}")
         raise HTTPException(500, f"Error retrieving history: {str(e)}")
@@ -832,21 +918,28 @@ def get_record_detail(
     """Retrieve a specific record by ID."""
     if not db_service.available:
         raise HTTPException(503, "Database not available")
-    
+
     if record_type not in ["audit", "redaction", "advisory"]:
         raise HTTPException(400, "Invalid record_type. Must be: audit, redaction, or advisory")
-    
+
     try:
         record = db_service.get_record(record_type, record_id)
         if not record:
             raise HTTPException(404, f"{record_type.capitalize()} record not found")
-        
+
+        standardized_response = convert_history_record_to_response(record, record_type, MODEL_NAME)
+
+        if not validate_response(standardized_response, record_type.upper()):
+            logger.warning(f"[Schema] History record validation failed for id={record_id}, type={record_type}")
+
         logger.debug(f"[API] Retrieved record detail: id={record_id}, type={record_type}")
         return {
             "success": True,
-            "record": record
+            "record": record,
+            "response": standardized_response,
+            "schema_version": SCHEMA_VERSION
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

@@ -4,6 +4,15 @@ import json
 import re
 
 from backend.logger import logger
+from backend.engines.response_schemas import (
+    build_audit_response,
+    build_advisory_response,
+    validate_audit_response,
+    SCHEMA_VERSION,
+)
+from backend.engines.confidence_engine import audit_scorer, advisory_scorer
+from backend.engines.input_quality_engine import assess_input_quality, InputQualityResult
+from backend.engines.contradiction_engine import validate_contradictions, apply_contradiction_suppression
 
 
 @dataclass
@@ -211,54 +220,205 @@ def parse_audit_issues(response_text: str) -> List[AuditIssue]:
 def is_json_response_mode(response_format: Optional[str]) -> bool:
     return str(response_format or "").strip().lower() == "json"
 
-def build_audit_json_payload(complete_response: str, model: str) -> Dict[str, Any]:
-    """Build a machine-readable audit response while retaining text fallback."""
-    issues = parse_audit_issues(complete_response)
-    if not issues:
-        return {
-            "success": True,
-            "model": model,
-            "mode": "AUDIT",
-            "response_type": "audit",
-            "issue_count": 0,
-            "issues": [],
-            "structured_parse_failed": True,
-            "legacy_text": complete_response,
-        }
+INPUT_QUALITY_WARNING = "Document quality appears degraded or corrupted. Results may be unreliable."
+SEMANTIC_SUPPRESSION_MESSAGE = "Document quality too degraded for reliable legal analysis."
 
-    logger.info("[API] Returning structured issue payload")
-    return {
-        "success": True,
-        "model": model,
-        "mode": "AUDIT",
-        "response_type": "audit",
-        "issue_count": len(issues),
-        "issues": [issue.to_dict() for issue in issues],
+
+def _assess_quoted_text_quality(text: str) -> bool:
+    """Check if input text has poor quality indicators that would make legal analysis unreliable.
+
+    Returns True if the text quality is poor enough to suppress semantic reasoning.
+    """
+    if not text or not text.strip():
+        return True
+
+    words = text.split()
+    if not words:
+        return True
+
+    import re
+    from backend.engines.input_quality_engine import (
+        _has_alternating_pattern,
+        _has_symbol_burst,
+        _has_excessive_substitutions,
+        _count_ocr_substitutions,
+    )
+
+    malformed_count = 0
+    digit_letter_mix = re.compile(r'(?=.*\d)(?=.*[a-zA-Z])[a-zA-Z0-9]{3,}')
+    consecutive_special = re.compile(r'[^\w\s]{2,}')
+
+    for word in words:
+        clean_word = re.sub(r'[^\w]', '', word)
+        if len(clean_word) < 3:
+            if len(word) >= 3 and (consecutive_special.search(word) or _has_symbol_burst(word)):
+                malformed_count += 1
+            continue
+
+        is_malformed = False
+        if digit_letter_mix.fullmatch(clean_word) and not clean_word.isdigit():
+            digit_ratio = sum(1 for c in clean_word if c.isdigit()) / len(clean_word)
+            if 0.1 <= digit_ratio <= 0.6:
+                is_malformed = True
+
+        if consecutive_special.search(word):
+            is_malformed = True
+
+        if _has_alternating_pattern(word):
+            is_malformed = True
+
+        if _has_excessive_substitutions(word):
+            is_malformed = True
+
+        if _has_symbol_burst(word):
+            is_malformed = True
+
+        if is_malformed:
+            malformed_count += 1
+
+    malformed_ratio = malformed_count / len(words)
+    symbol_count = sum(1 for c in text if not c.isalnum() and not c.isspace())
+    symbol_density = symbol_count / len(text) if text else 0
+
+    return malformed_ratio > 0.20 or symbol_density > 0.25
+
+
+def build_audit_json_payload(complete_response: str, model: str, user_input: str = "", fallback_used: bool = False) -> Dict[str, Any]:
+    """Build a machine-readable audit response while retaining text fallback."""
+    logger.info("[FallbackTrace] stage=build_audit_json_payload_entry fallback_used=%s", fallback_used)
+    issues = parse_audit_issues(complete_response)
+    parse_failed = len(issues) == 0
+
+    duplicate_suppressed = 0
+    if not parse_failed:
+        original_count = len(issues)
+        issues = normalize_audit_issue_severity_fields(issues)
+        issues = normalize_audit_issue_fields(issues)
+        duplicate_suppressed = original_count - len(issues)
+
+        contradictions = validate_contradictions(issues)
+        if contradictions:
+            issues = apply_contradiction_suppression(issues, contradictions)
+
+    quality_result = assess_input_quality(user_input)
+    input_quality_degraded = quality_result.is_degraded
+    quality_warning = INPUT_QUALITY_WARNING if input_quality_degraded else ""
+
+    semantic_suppressed = False
+    if fallback_used and input_quality_degraded and _assess_quoted_text_quality(user_input):
+        semantic_suppressed = True
+        logger.warning(
+            "[SemanticSuppression] TRIGGERED: fallback_used=True, input_quality_degraded=True, quoted_text_quality=poor"
+        )
+        issues = []
+        parse_failed = True
+        complete_response = SEMANTIC_SUPPRESSION_MESSAGE
+
+    confidence_result = audit_scorer.compute(
+        response_text=complete_response,
+        issue_count=len(issues),
+        structured_parse_failed=parse_failed,
+        fallback_used=fallback_used,
+        duplicate_suppressed=duplicate_suppressed,
+        input_quality_degraded=input_quality_degraded,
+    )
+
+    metadata = {
+        "model_name": model,
+        "inference_duration_ms": 0,
+        "parser_used": "json" if not parse_failed else "text",
+        "fallback_used": fallback_used,
+        "semantic_suppressed": semantic_suppressed,
     }
 
-def build_mode_json_payload(complete_response: str, model: str, mode: str) -> Dict[str, Any]:
+    if input_quality_degraded:
+        metadata["input_quality"] = "LOW"
+        metadata["input_quality_score"] = round(quality_result.score, 4)
+        metadata["input_quality_warnings"] = quality_result.warnings
+
+    if parse_failed:
+        return build_audit_response(
+            complete_response=complete_response,
+            model=model,
+            issues=[],
+            structured_parse_failed=True,
+            confidence_score=confidence_result.score,
+            confidence_label=confidence_result.label,
+            quality_warning=quality_warning,
+            metadata=metadata,
+        )
+
+    logger.info("[API] Returning structured issue payload")
+    return build_audit_response(
+        complete_response=complete_response,
+        model=model,
+        issues=[issue.to_dict() for issue in issues],
+        structured_parse_failed=False,
+        confidence_score=confidence_result.score,
+        confidence_label=confidence_result.label,
+        quality_warning=quality_warning,
+        metadata=metadata,
+    )
+
+def build_mode_json_payload(complete_response: str, model: str, mode: str, user_query: str = "", fallback_used: bool = False) -> Dict[str, Any]:
     """Build mode-aware JSON while preserving legacy text compatibility."""
+    logger.info("[FallbackTrace] stage=build_mode_json_payload_entry fallback_used=%s mode=%s", fallback_used, mode)
     normalized_mode = (mode or "AUDIT").upper()
     if normalized_mode == "AUDIT":
-        return build_audit_json_payload(complete_response, model)
+        return build_audit_json_payload(complete_response, model, user_input=user_query, fallback_used=fallback_used)
 
-    payload: Dict[str, Any] = {
+    if normalized_mode == "ADVISORY":
+        quality_result = assess_input_quality(user_query)
+        input_quality_degraded = quality_result.is_degraded
+        quality_warning = INPUT_QUALITY_WARNING if input_quality_degraded else ""
+
+        semantic_suppressed = False
+        if fallback_used and input_quality_degraded and _assess_quoted_text_quality(user_query):
+            semantic_suppressed = True
+            logger.warning(
+                "[SemanticSuppression] ADVISORY TRIGGERED: fallback_used=True, input_quality_degraded=True, quoted_text_quality=poor"
+            )
+            complete_response = SEMANTIC_SUPPRESSION_MESSAGE
+
+        confidence_result = advisory_scorer.compute(
+            response_text=complete_response,
+            user_query=user_query,
+            input_quality_degraded=input_quality_degraded,
+            fallback_used=fallback_used,
+        )
+        metadata = {
+            "model_name": model,
+            "inference_duration_ms": 0,
+            "fallback_used": fallback_used,
+            "semantic_suppressed": semantic_suppressed,
+        }
+        if input_quality_degraded:
+            metadata["input_quality"] = "LOW"
+            metadata["input_quality_score"] = round(quality_result.score, 4)
+            metadata["input_quality_warnings"] = quality_result.warnings
+
+        return build_advisory_response(
+            complete_response=complete_response,
+            model=model,
+            confidence_score=confidence_result.score,
+            confidence_label=confidence_result.label,
+            quality_warning=quality_warning,
+            metadata=metadata,
+        )
+
+    return {
         "success": True,
         "model": model,
         "mode": normalized_mode,
         "response_type": normalized_mode.lower(),
+        "schema_version": SCHEMA_VERSION,
         "issue_count": 0,
         "issues": [],
         "structured_parse_failed": False,
         "legacy_text": complete_response,
+        "redacted_text": complete_response,
+        "fallback_used": fallback_used,
     }
-
-    if normalized_mode == "REDACTION":
-        payload["redacted_text"] = complete_response
-    elif normalized_mode == "ADVISORY":
-        payload["advisory_text"] = complete_response
-
-    return payload
 
 def render_audit_issues_as_text(issues: List[AuditIssue]) -> str:
     def render_line(field_name: str, value: str) -> str:

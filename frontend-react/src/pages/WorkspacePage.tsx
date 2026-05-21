@@ -158,6 +158,10 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
           original_text: "",
           redacted_text: "",
           advisory_text: "",
+          confidence_score: detail.record.confidence_score ?? detail.response?.confidence_score,
+          confidence_label: detail.record.confidence_label ?? detail.response?.confidence_label,
+          fallback_used: detail.record.fallback_used ?? detail.response?.fallback_used,
+          metadata: detail.record.metadata ?? detail.response?.metadata,
         };
 
         onRecordOpen(record, auditResponse);

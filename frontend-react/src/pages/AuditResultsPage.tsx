@@ -1,8 +1,9 @@
-import { ArrowLeft, AlertCircle, CheckCircle2, Eraser, FileSearch, MessageSquareText, ShieldCheck } from "lucide-react";
+import { ArrowLeft, AlertCircle, AlertTriangle, CheckCircle2, Eraser, FileSearch, MessageSquareText, ShieldCheck } from "lucide-react";
 import { CollapsibleIssueCard } from "../components/CollapsibleIssueCard";
 import { ExportButtons } from "../components/ExportButtons";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
+import { ConfidenceBadge } from "../components/ConfidenceBadge";
 import type { AuditResponse } from "../types";
 import type { ApiError } from "../api";
 import { groupIssuesByCategory, getSeverityCounts } from "../utils";
@@ -106,6 +107,11 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
       ? "Redacted output"
       : "Advisory guidance";
 
+  const confidenceLabel = result.confidence_label;
+  const confidenceScore = result.confidence_score;
+  const isLowConfidence = confidenceLabel === "LOW";
+  const isMediumConfidence = confidenceLabel === "MEDIUM";
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-5 py-8 sm:px-8">
       <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 sm:flex-row sm:items-center sm:justify-between">
@@ -121,6 +127,11 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
               <CategorySummary issues={result.issues} />
             </>
           ) : null}
+          {confidenceLabel && confidenceScore !== undefined && (
+            <div className="mt-2">
+              <ConfidenceBadge confidence={confidenceScore} label={confidenceLabel} size="md" />
+            </div>
+          )}
         </div>
         <div className="flex flex-col items-end gap-3 sm:flex-row">
           <ExportButtons result={result} />
@@ -134,6 +145,34 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
           </button>
         </div>
       </header>
+
+      {isLowConfidence && (
+        <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 flex-shrink-0 text-red-600 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-semibold text-red-800">Low Confidence Response</h3>
+              <p className="mt-1 text-sm text-red-700">
+                This response may be incomplete or unreliable. Review the results carefully and consider re-running the analysis.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {isMediumConfidence && !isLowConfidence && (
+        <section className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-600 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-semibold text-amber-800">Medium Confidence</h3>
+              <p className="mt-1 text-sm text-amber-700">
+                Some aspects of this response may be incomplete. Review results for accuracy.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {!isAuditMode ? (
         <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">

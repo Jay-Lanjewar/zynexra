@@ -4,6 +4,10 @@ import re
 
 from backend.logger import logger
 from backend.utils.pii import pre_redact_pii
+from backend.engines.response_schemas import (
+    build_redaction_response,
+    SCHEMA_VERSION,
+)
 
 
 @dataclass
@@ -36,21 +40,13 @@ class RedactionResult:
     fallback_used: bool = False
 
     def to_payload(self, model: str) -> Dict[str, object]:
-        return {
-            "success": True,
-            "model": model,
-            "mode": "REDACTION",
-            "response_type": "redaction",
-            "issue_count": 0,
-            "issues": [],
-            "structured_parse_failed": False,
-            "legacy_text": self.redacted_text,
-            "redacted_text": self.redacted_text,
-            "original_text": self.original_text,
-            "redaction_entities": [entity.to_dict() for entity in self.entities],
-            "redaction_count": len(self.entities),
-            "fallback_used": self.fallback_used,
-        }
+        return build_redaction_response(
+            model=model,
+            original_text=self.original_text,
+            redacted_text=self.redacted_text,
+            redaction_entities=[entity.to_dict() for entity in self.entities],
+            fallback_used=self.fallback_used
+        )
 
 
 class RedactionEngine:
