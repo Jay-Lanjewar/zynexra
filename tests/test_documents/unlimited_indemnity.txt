@@ -1,0 +1,11 @@
+INDEMNIFICATION CLAUSE
+
+Section 12. Indemnification. The Vendor agrees to indemnify, defend, and hold harmless the Company, its affiliates, officers, directors, employees, and agents from and against any and all losses, damages, liabilities, claims, demands, judgments, settlements, costs, and expenses (including reasonable attorneys' fees) arising out of or relating to: (a) any breach of this Agreement by Vendor; (b) any negligence or willful misconduct of Vendor; (c) any infringement of third-party intellectual property rights; (d) any product liability claims; and (e) any violation of applicable law by Vendor.
+
+Such indemnification obligations shall be without limit and without cap. Vendor's indemnification obligations under this Section 12 shall survive any termination or expiration of this Agreement and shall continue in full force and effect indefinitely.
+
+Vendor shall not enter into any settlement without the prior written consent of the Company. The Company reserves the right to assume the defense of any claim at Vendor's expense.
+
+This indemnification is unlimited in duration and amount. There is no maximum liability, no aggregate cap, and no limitation on the types or amounts of damages recoverable. Vendor waives any right to limit liability based on insurance coverage or otherwise.
+
+[END OF EXCERPT]

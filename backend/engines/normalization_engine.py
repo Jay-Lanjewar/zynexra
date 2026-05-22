@@ -13,6 +13,11 @@ from backend.engines.response_schemas import (
 from backend.engines.confidence_engine import audit_scorer, advisory_scorer
 from backend.engines.input_quality_engine import assess_input_quality, InputQualityResult
 from backend.engines.contradiction_engine import validate_contradictions, apply_contradiction_suppression
+from backend.engines.legal_domain_engine import (
+    compute_document_domain_confidence,
+    DocumentDomain,
+    DOMAIN_SUPPRESSION_MESSAGE,
+)
 
 
 @dataclass
@@ -314,6 +319,26 @@ def build_audit_json_payload(complete_response: str, model: str, user_input: str
         parse_failed = True
         complete_response = SEMANTIC_SUPPRESSION_MESSAGE
 
+    domain_suppressed = False
+    if user_input and not semantic_suppressed:
+        domain_result = compute_document_domain_confidence(user_input)
+        domain_metadata = {
+            "domain": domain_result.domain.value,
+            "domain_confidence": round(domain_result.confidence, 4),
+        }
+        if domain_result.domain == DocumentDomain.NON_LEGAL:
+            domain_suppressed = True
+            logger.warning(
+                "[DomainDetection] SUPPRESSION TRIGGERED: domain=NON_LEGAL "
+                "legal_keyword_ratio=%.4f structure_score=%.4f",
+                domain_result.legal_keyword_ratio, domain_result.structure_score,
+            )
+            issues = []
+            parse_failed = True
+            complete_response = DOMAIN_SUPPRESSION_MESSAGE
+    else:
+        domain_metadata = {}
+
     confidence_result = audit_scorer.compute(
         response_text=complete_response,
         issue_count=len(issues),
@@ -323,6 +348,14 @@ def build_audit_json_payload(complete_response: str, model: str, user_input: str
         input_quality_degraded=input_quality_degraded,
     )
 
+    if domain_suppressed:
+        confidence_result.score = min(confidence_result.score, 0.25)
+        confidence_result.label = "LOW"
+        logger.warning(
+            "[DomainDetection] Confidence capped: score=%.2f label=%s",
+            confidence_result.score, confidence_result.label,
+        )
+
     metadata = {
         "model_name": model,
         "inference_duration_ms": 0,
@@ -330,6 +363,9 @@ def build_audit_json_payload(complete_response: str, model: str, user_input: str
         "fallback_used": fallback_used,
         "semantic_suppressed": semantic_suppressed,
     }
+
+    if domain_metadata:
+        metadata.update(domain_metadata)
 
     if input_quality_degraded:
         metadata["input_quality"] = "LOW"

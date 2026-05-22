@@ -1,0 +1,21 @@
+CONFIDENTIALITY AND NON-DISCLOSURE AGREEMENT
+
+This Confidentiality and Non-Disclosure Agreement (the "Agreement") is entered into as of May 22, 2026 by and between Zynexra Inc., a Delaware corporation ("Disclosing Party"), and Recipient Corp., a Texas corporation ("Receiving Party").
+
+1. CONFIDENTIAL INFORMATION. "Confidential Information" means all non-public information disclosed by Disclosing Party to Receiving Party, whether orally, in writing, or by any other medium, that is designated as confidential or that reasonably should be understood to be confidential given the nature of the information and circumstances of disclosure.
+
+2. OBLIGATIONS. Receiving Party agrees to: (a) hold Confidential Information in confidence using at least the same degree of care it uses to protect its own confidential information; (b) not disclose Confidential Information to any third party without prior written consent; (c) use Confidential Information solely for the purpose of evaluating a potential business relationship; and (d) limit access to those employees who need to know.
+
+3. EXCLUSIONS. Confidential Information does not include information that: (a) is or becomes publicly available without breach of this Agreement; (b) was known to Receiving Party prior to disclosure; (c) is independently developed by Receiving Party without use of Confidential Information; or (d) is rightfully received from a third party without restriction.
+
+4. TERM. This Agreement shall commence on the Effective Date and continue for a period of two (2) years. Confidentiality obligations shall survive termination and continue for an additional three (3) years.
+
+5. RETURN OF MATERIALS. Upon request, Receiving Party shall promptly return or destroy all Confidential Information and certify such destruction in writing.
+
+6. NO LICENSE. Nothing in this Agreement grants any intellectual property license or right to Receiving Party.
+
+7. REMEDIES. Receiving Party acknowledges that monetary damages may be inadequate and that Disclosing Party is entitled to injunctive relief for any breach.
+
+8. GOVERNING LAW. This Agreement shall be governed by the laws of the State of Delaware.
+
+9. ENTIRE AGREEMENT. This Agreement constitutes the entire agreement between the parties and supersedes all prior discussions.
