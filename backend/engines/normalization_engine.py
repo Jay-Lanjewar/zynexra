@@ -11,7 +11,11 @@ from backend.engines.response_schemas import (
 )
 from backend.engines.confidence_engine import audit_scorer, advisory_scorer
 from backend.engines.input_quality_engine import assess_input_quality, InputQualityResult
-from backend.engines.contradiction_engine import validate_contradictions, apply_contradiction_suppression
+from backend.engines.contradiction_engine import (
+    validate_contradictions,
+    apply_contradiction_suppression,
+    classify_document_contradictions,
+)
 from backend.engines.legal_domain_engine import (
     compute_document_domain_confidence,
     DocumentDomain,
@@ -29,10 +33,28 @@ class AuditIssue:
     quoted_text: str = ""
     risk_explanation: str = ""
     suggested_improvement: str = ""
+    contradiction_detected: Optional[bool] = None
+    original_category: Optional[str] = None
+    related_clause_count: Optional[int] = None
     extra_fields: Dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, str]:
-        return {field_name: str(value or "") for field_name, value in asdict(self).items() if field_name != "extra_fields"}
+    def to_dict(self) -> Dict[str, Any]:
+        res = {}
+        for field_name, value in asdict(self).items():
+            if field_name == "extra_fields":
+                continue
+            if field_name == "contradiction_detected":
+                if value is not None:
+                    res[field_name] = bool(value)
+            elif field_name == "original_category":
+                if value is not None:
+                    res[field_name] = str(value)
+            elif field_name == "related_clause_count":
+                if value is not None:
+                    res[field_name] = int(value)
+            else:
+                res[field_name] = str(value or "")
+        return res
 
 AUDIT_ISSUE_FIELDS = [
     "issue_title",
@@ -299,9 +321,16 @@ def build_audit_json_payload(complete_response: str, model: str, user_input: str
         issues = normalize_audit_issue_fields(issues)
         duplicate_suppressed = original_count - len(issues)
 
-        contradictions = validate_contradictions(issues)
+        contradictions = validate_contradictions(issues, user_input)
         if contradictions:
             issues = apply_contradiction_suppression(issues, contradictions)
+
+        elevated_count = classify_document_contradictions(issues, user_input)
+        if elevated_count:
+            logger.info(
+                "[ContradictionClassification] Elevated %d issue(s) to Structural Inconsistency in pipeline",
+                elevated_count
+            )
 
     quality_result = assess_input_quality(user_input)
     input_quality_degraded = quality_result.is_degraded
@@ -534,6 +563,12 @@ def sanitize_capped_indemnity_text(text: str) -> str:
         sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
     return sanitized
 
+CONTRADICTION_INCOMPATIBLE_CATEGORIES = {
+    "indemnification",
+    "liability exposure",
+}
+
+
 def normalize_audit_issue_fields(issues: List[AuditIssue]) -> List[AuditIssue]:
     """Normalize categories, language, and duplicates using structured fields."""
     unlimited_tokens = re.compile(r"\b(unlimited|uncapped|no cap|no limit)\b", re.IGNORECASE)
@@ -611,17 +646,20 @@ def normalize_audit_issue_fields(issues: List[AuditIssue]) -> List[AuditIssue]:
             category_lower = new_category.lower()
 
         severity_text = issue.severity.strip().upper()
-        if severity_text in {"HIGH", "CRITICAL"} and structural_heuristic_cues.search(combined_issue_text):
-            logger.info("[Normalization] Structural heuristic trigger -> Structural Inconsistency")
-            if issue.category != "Structural Inconsistency":
-                issue.category = "Structural Inconsistency"
-                category_lower = "structural inconsistency"
 
-        if structural_cues.search(issue.risk_explanation) or structural_cues.search(issue.quoted_text):
-            if issue.category != "Structural Inconsistency":
-                logger.info("[Normalization] Category remap -> %s -> Structural Inconsistency", issue.category)
-                issue.category = "Structural Inconsistency"
-                category_lower = "structural inconsistency"
+        # NEVER remap indemnification/liability categories to Structural Inconsistency
+        if category_lower not in CONTRADICTION_INCOMPATIBLE_CATEGORIES:
+            if severity_text in {"HIGH", "CRITICAL"} and structural_heuristic_cues.search(combined_issue_text):
+                logger.info("[Normalization] Structural heuristic trigger -> Structural Inconsistency")
+                if issue.category != "Structural Inconsistency":
+                    issue.category = "Structural Inconsistency"
+                    category_lower = "structural inconsistency"
+
+            if structural_cues.search(issue.risk_explanation) or structural_cues.search(issue.quoted_text):
+                if issue.category != "Structural Inconsistency":
+                    logger.info("[Normalization] Category remap -> %s -> Structural Inconsistency", issue.category)
+                    issue.category = "Structural Inconsistency"
+                    category_lower = "structural inconsistency"
 
         if "residuals" in category_lower:
             cleaned_risk = re.sub(
@@ -791,6 +829,7 @@ def suppress_duplicate_quoted_issues(response_text: str) -> str:
         normalized_output += "\n\n" + suffix
     return normalized_output
 
+
 def normalize_issue_output(response_text: str) -> str:
     """Normalize categories and language for deterministic outputs."""
     if "Issue:" not in response_text:
@@ -922,30 +961,32 @@ def normalize_issue_output(response_text: str) -> str:
             category_lower = new_category.lower()
 
         # 2. Heuristic structural conflict detection for adversarial contract contradictions.
-        if severity_text in {"HIGH", "CRITICAL"} and structural_heuristic_cues.search(combined_issue_text):
-            logger.info("[Normalization] Structural heuristic trigger -> Structural Inconsistency")
-            if category_text != "Structural Inconsistency":
-                block = re.sub(
-                    r"(?im)^(Category:\s*).+$",
-                    r"\1Structural Inconsistency",
-                    block,
-                    count=1
-                )
-                category_text = "Structural Inconsistency"
-                category_lower = category_text.lower()
+        if category_lower not in CONTRADICTION_INCOMPATIBLE_CATEGORIES:
+            if severity_text in {"HIGH", "CRITICAL"} and structural_heuristic_cues.search(combined_issue_text):
+                logger.info("[Normalization] Structural heuristic trigger -> Structural Inconsistency")
+                if category_text != "Structural Inconsistency":
+                    block = re.sub(
+                        r"(?im)^(Category:\s*).+$",
+                        r"\1Structural Inconsistency",
+                        block,
+                        count=1
+                    )
+                    category_text = "Structural Inconsistency"
+                    category_lower = category_text.lower()
 
         # 3. Structural conflict normalization based on quoted or risk language
-        if structural_cues.search(risk_text) or structural_cues.search(quoted_text):
-            if category_text != "Structural Inconsistency":
-                logger.info("[Normalization] Category remap -> %s -> Structural Inconsistency", category_text)
-                block = re.sub(
-                    r"(?im)^(Category:\s*).+$",
-                    r"\1Structural Inconsistency",
-                    block,
-                    count=1
-                )
-                category_text = "Structural Inconsistency"
-                category_lower = category_text.lower()
+        if category_lower not in CONTRADICTION_INCOMPATIBLE_CATEGORIES:
+            if structural_cues.search(risk_text) or structural_cues.search(quoted_text):
+                if category_text != "Structural Inconsistency":
+                    logger.info("[Normalization] Category remap -> %s -> Structural Inconsistency", category_text)
+                    block = re.sub(
+                        r"(?im)^(Category:\s*).+$",
+                        r"\1Structural Inconsistency",
+                        block,
+                        count=1
+                    )
+                    category_text = "Structural Inconsistency"
+                    category_lower = category_text.lower()
 
         # 4. Residuals language cleanup
         if "residuals" in category_lower:

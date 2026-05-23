@@ -22,9 +22,12 @@ class AuditIssue:
     quoted_text: str = ""
     risk_explanation: str = ""
     suggested_improvement: str = ""
+    contradiction_detected: Optional[bool] = None
+    original_category: Optional[str] = None
+    related_clause_count: Optional[int] = None
 
-    def to_dict(self) -> Dict[str, str]:
-        return {
+    def to_dict(self) -> Dict[str, Any]:
+        res = {
             "issue_title": self.issue_title,
             "severity": self.severity,
             "category": self.category,
@@ -33,6 +36,14 @@ class AuditIssue:
             "risk_explanation": self.risk_explanation,
             "suggested_improvement": self.suggested_improvement,
         }
+        if self.contradiction_detected is not None:
+            res["contradiction_detected"] = self.contradiction_detected
+        if self.original_category is not None:
+            res["original_category"] = self.original_category
+        if self.related_clause_count is not None:
+            res["related_clause_count"] = self.related_clause_count
+        return res
+
 
 
 @dataclass

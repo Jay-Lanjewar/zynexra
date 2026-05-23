@@ -192,7 +192,7 @@ def _find_document_level_conflicts(issues: list) -> Set[int]:
     return conflict_indices
 
 
-def validate_contradictions(issues: list) -> List[ContradictionResult]:
+def validate_contradictions(issues: list, document_text: str = "") -> List[ContradictionResult]:
     results: List[ContradictionResult] = []
 
     document_conflict_indices = _find_document_level_conflicts(issues)
@@ -295,3 +295,108 @@ def apply_contradiction_suppression(issues: list, contradictions: List[Contradic
         logger.info("[ContradictionSuppression] No issues suppressed")
 
     return kept_issues
+
+
+CONTRADICTION_INCOMPATIBLE_CATEGORIES = {
+    "indemnification",
+    "liability exposure",
+}
+
+
+def _scan_document_contradictions(document_text: str) -> Set[str]:
+    """
+    Scan full document text for contradictory clauses where one clause
+    says an obligation survives termination and another says it terminates
+    in the same obligation domain.
+
+    Returns set of domain regex patterns that are in conflict.
+    """
+    if not document_text or not document_text.strip():
+        return set()
+
+    clauses = [c.strip() for c in re.split(r'\n\s*\n+', document_text) if c.strip()]
+    if len(clauses) < 2:
+        return set()
+
+    survival_domains: Set[str] = set()
+    termination_domains: Set[str] = set()
+
+    for clause in clauses:
+        if _has_survival_language(clause):
+            survival_domains.update(_extract_obligation_domains(clause))
+        if _has_termination_language(clause):
+            termination_domains.update(_extract_obligation_domains(clause))
+
+    return survival_domains & termination_domains
+
+
+def classify_document_contradictions(issues: list, document_text: str = "") -> int:
+    """
+    Elevate issues involved in document-level contradictions to Structural Inconsistency.
+
+    Detects contradictions both between existing issues and by scanning the full document.
+    For each contradictory issue:
+      - Sets category -> 'Structural Inconsistency'
+      - Sets contradiction_detected -> True
+      - Preserves original category in original_category
+
+    Returns the number of elevated issues.
+    """
+    # 1. Find contradictions between existing issues
+    conflict_indices = _find_document_level_conflicts(issues)
+
+    # 2. Scan full document for clause-level contradictions not yet captured
+    has_document_conflict = False
+    if document_text:
+        conflicting_domains = _scan_document_contradictions(document_text)
+        if conflicting_domains:
+            has_document_conflict = True
+            for idx, issue in enumerate(issues):
+                combined = " ".join(filter(None, [
+                    issue.category, issue.quoted_text, issue.risk_explanation
+                ]))
+                issue_domains = _extract_obligation_domains(combined)
+                if issue_domains & conflicting_domains:
+                    conflict_indices.add(idx)
+
+    # 3. Early exit if no conflict detected at all
+    if not conflict_indices:
+        logger.info(
+            "[ContradictionClassification] skipped_reason=no_conflict_detected "
+            "issue_level=%s document_level=%s issues=%d",
+            bool(_find_document_level_conflicts(issues)),
+            has_document_conflict,
+            len(issues)
+        )
+        return 0
+
+    # 4. Elevate all conflicting issues (with category allowlist)
+    elevated_count = 0
+    for idx in conflict_indices:
+        if idx < len(issues):
+            issue = issues[idx]
+            if issue.category != "Structural Inconsistency":
+                if issue.category.lower() in CONTRADICTION_INCOMPATIBLE_CATEGORIES:
+                    logger.info(
+                        "[ContradictionClassification] skipped_reason=non_compatible_category "
+                        "issue=%d category='%s'",
+                        idx, issue.category
+                    )
+                    continue
+                issue.original_category = issue.category
+                issue.category = "Structural Inconsistency"
+                issue.contradiction_detected = True
+                elevated_count += 1
+                logger.info(
+                    "[ContradictionClassification] Elevated issue %d: '%s' -> Structural Inconsistency "
+                    "(contradiction_detected=True)",
+                    idx, issue.original_category
+                )
+
+    if elevated_count:
+        logger.info(
+            "[ContradictionClassification] Total issues elevated: %d",
+            elevated_count
+        )
+
+    return elevated_count
