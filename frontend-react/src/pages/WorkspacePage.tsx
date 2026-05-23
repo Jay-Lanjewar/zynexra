@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { HistoryRecord, HistoryFilter, ApiError } from "../api";
 import {
   getHistoryRecords,
@@ -13,6 +13,7 @@ import { HistoryFilterUI } from "../components/HistoryFilter";
 import { ActivitySummary } from "../components/ActivitySummary";
 import { HistoryListSkeleton, SummarySkeleton } from "../components/LoadingSkeleton";
 import { FolderOpen, FileSearch, Eraser, MessageSquareText, ArrowLeft } from "lucide-react";
+import { persistence } from "../utils/persistence";
 
 interface WorkspacePageProps {
   onModeChange: (mode: AppMode | "WORKSPACE") => void;
@@ -27,23 +28,39 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
   const [records, setRecords] = useState<HistoryRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
-  const [filter, setFilter] = useState<HistoryFilter>({
-    recordType: "all",
-    limit: ITEMS_PER_PAGE,
-    offset: 0,
+  const [filter, setFilter] = useState<HistoryFilter>(() => {
+    const saved = persistence.loadFilters();
+    if (saved && saved.filter && saved.activeTab) {
+      return { ...saved.filter, limit: ITEMS_PER_PAGE, offset: 0 };
+    }
+    return {
+      recordType: "all",
+      limit: ITEMS_PER_PAGE,
+      offset: 0,
+    };
   });
   const [summary, setSummary] = useState<HistorySummary | undefined>();
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [total, setTotal] = useState(0);
+  const filterKey = JSON.stringify({ tab: activeTab, ...filter });
+  const initialTabSet = useRef(false);
 
   useEffect(() => {
+    const saved = persistence.loadFilters();
+    if (saved && saved.activeTab) {
+      setActiveTab(saved.activeTab as "all" | "audit" | "redaction" | "advisory");
+    }
     fetchSummary();
+    initialTabSet.current = true;
   }, []);
 
   useEffect(() => {
-    fetchRecords();
-  }, [activeTab, filter.offset, filter.limit]);
+    if (initialTabSet.current) {
+      fetchRecords();
+      persistence.saveFilters({ filter, activeTab, timestamp: Date.now() });
+    }
+  }, [filterKey]);
 
   async function fetchRecords() {
     try {

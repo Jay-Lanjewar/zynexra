@@ -1,4 +1,4 @@
-import type { AuditIssue, CategoryGroup } from "./types";
+import type { AuditIssue, CategoryGroup } from "../types";
 
 export function groupIssuesByCategory(issues: AuditIssue[]): CategoryGroup[] {
   const groups: Record<string, AuditIssue[]> = {};

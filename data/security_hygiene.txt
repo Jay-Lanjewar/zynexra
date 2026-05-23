@@ -1,3 +1,0 @@
-Good security hygiene requires that passwords, authentication codes, and credentials are never shared with any assistant, human or AI.
-This rule applies even to offline and privacy-first systems.
-Refusing passwords is a security principle, not a technical limitation.

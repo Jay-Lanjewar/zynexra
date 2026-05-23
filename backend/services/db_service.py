@@ -142,6 +142,26 @@ def parse_legacy_messages_json(json_str: str, record_id: int, db_path: str,
         return [], False
 
 
+def _ensure_iso_timestamp(ts: Optional[str]) -> Optional[str]:
+    """Convert SQLite datetime string to ISO 8601 format with timezone.
+    
+    SQLite CURRENT_TIMESTAMP returns '2026-05-22 12:30:00' (UTC without T/Z).
+    This converts to '2026-05-22T12:30:00Z' for unambiguous JS parsing.
+    """
+    if not ts:
+        return None
+    try:
+        # Already ISO-like with T separator
+        if "T" in ts:
+            if ts.endswith("Z") or "+" in ts[19:] or " " not in ts:
+                return ts
+            return ts.replace(" ", "T") + "Z"
+        # SQLite format: "2026-05-22 12:30:00"
+        return ts.replace(" ", "T") + "Z"
+    except Exception:
+        return ts
+
+
 class DatabaseService:
     """Lightweight database service with optional graceful degradation."""
     
@@ -424,7 +444,7 @@ class DatabaseService:
                 results.append({
                     "id": row[0],
                     "filename": row[1],
-                    "timestamp": row[2],
+                    "timestamp": _ensure_iso_timestamp(row[2]),
                     "issue_count": row[3],
                     "issues": issues,
                     "raw_response": row[5],
@@ -489,7 +509,7 @@ class DatabaseService:
                 results.append({
                     "id": row[0],
                     "filename": row[1],
-                    "timestamp": row[2],
+                    "timestamp": _ensure_iso_timestamp(row[2]),
                     "redaction_count": row[3],
                     "entities": entities,
                     "redacted_text": row[5],
@@ -540,7 +560,7 @@ class DatabaseService:
                     "session_id": row[1],
                     "title": row[2],
                     "messages": messages,
-                    "timestamp": row[4],
+                    "timestamp": _ensure_iso_timestamp(row[4]),
                     "message_count": row[5]
                 })
             
@@ -581,7 +601,7 @@ class DatabaseService:
                     return {
                         "id": row[0],
                         "filename": row[1],
-                        "timestamp": row[2],
+                        "timestamp": _ensure_iso_timestamp(row[2]),
                         "issue_count": row[3],
                         "issues": issues,
                         "raw_response": row[5],
@@ -598,7 +618,7 @@ class DatabaseService:
                     return {
                         "id": row[0],
                         "filename": row[1],
-                        "timestamp": row[2],
+                        "timestamp": _ensure_iso_timestamp(row[2]),
                         "redaction_count": row[3],
                         "entities": entities,
                         "redacted_text": row[5],
@@ -616,7 +636,7 @@ class DatabaseService:
                         "session_id": row[1],
                         "title": row[2],
                         "messages": messages,
-                        "timestamp": row[4],
+                        "timestamp": _ensure_iso_timestamp(row[4]),
                         "message_count": row[5]
                     }
             

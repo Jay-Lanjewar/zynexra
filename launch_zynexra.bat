@@ -40,18 +40,18 @@ pip install --user -r requirements.txt >nul 2>nul
 
 REM ---- Start backend ----
 echo Starting Zynexra backend...
-start "Zynexra Backend" cmd /k "cd /d \"%~dp0\" && uvicorn app:app --host 127.0.0.1 --port 8000"
+start "Zynexra Backend" cmd /k "cd /d \"%~dp0\" && uvicorn backend.app:app --host 127.0.0.1 --port 8000"
 
 timeout /t 3 >nul
 
 REM ---- Start frontend ----
-echo Launching Zynexra interface...
-start "Zynexra UI" cmd /k "cd /d \"%~dp0\" && streamlit run ui_streamlit.py"
+echo Starting React frontend...
+start "Zynexra UI" cmd /k "cd /d \"%~dp0\" && cd frontend-react && npm run dev"
 
 echo.
 echo Zynexra windows opened:
 echo  - Backend: http://127.0.0.1:8000
-echo  - UI:      http://localhost:8501
+echo  - Frontend: http://localhost:5173
 echo Close these terminals to stop Zynexra.
 echo.
 pause

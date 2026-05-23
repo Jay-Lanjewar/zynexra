@@ -1,301 +1,210 @@
 # Zynexra
 
-**Zynexra** is a privacy-first offline AI system for analyzing legal documents and identifying structural risks in contracts.
-
-It runs entirely **locally** using Ollama-hosted language models and provides deterministic post-processing and validation to ensure stable outputs.
-
-The system is designed for environments where **confidentiality is critical**, such as legal teams reviewing contracts, NDAs, and agreements.
+**Zynexra** is a privacy-first offline AI system for analyzing legal documents and identifying structural risks in contracts. It runs entirely **locally** using Ollama-hosted language models with deterministic post-processing and validation for stable outputs.
 
 ---
 
-# Key Features
+## Features
 
-### Offline AI
-
-Zynexra runs fully locally.
-
-* No external APIs
-* No cloud processing
-* No internet access required
-* Documents never leave the machine
-
----
-
-### Legal Document Risk Analysis
-
-In **AUDIT mode**, Zynexra analyzes contracts to detect:
-
-* Liability exposure
-* Indemnification risk
-* Structural inconsistencies
-* Confidentiality weaknesses
-* Governing law issues
-* Missing protective clauses
-
-Each issue is returned in a structured format including:
-
-* severity level
-* clause location
-* quoted text
-* risk explanation
-* suggested improvement
+- **Audit Mode** — Analyzes contracts for liability exposure, indemnification risk, structural inconsistencies, confidentiality weaknesses, governing law issues, and missing protective clauses.
+- **Redaction Mode** — Detects and redacts PII (names, emails, phones, addresses, companies).
+- **Advisory Mode** — Answers legal-practice questions with context-aware responses.
+- **Confidence Scoring** — Multi-factor confidence system with quality/domain-aware caps.
+- **Contradiction Detection** — Flags survival-clause vs category mismatches automatically.
+- **OCR Degradation Detection** — Identifies corrupted/noisy text and suppresses unreliable analysis.
+- **Legal-Domain Guard** — Prevents hallucinated legal analysis on non-legal content (recipes, essays, etc.).
 
 ---
 
-### Privacy Redaction
+## Setup
 
-In **REDACTION mode**, Zynexra detects and removes personally identifiable information (PII).
+### Prerequisites
 
-It automatically redacts:
+- Python 3.11+
+- Node.js 18+
+- [Ollama](https://ollama.com)
 
-* names
-* email addresses
-* phone numbers
-* addresses
-* other sensitive information
+### 1. Install Ollama & Pull Models
 
-Redacted data is replaced with:
-
-```
-[REDACTED]
-```
-
----
-
-### Deterministic Output Controls
-
-Zynexra includes deterministic post-processing layers that normalize model output to maintain stable behavior.
-
-These layers:
-
-* enforce severity overrides
-* normalize category names
-* prevent invalid rewrites
-* ensure confidentiality protections are preserved
-* enforce liability cap suggestions when required
-
-This makes the system significantly more reliable than raw LLM output.
-
----
-
-### Validation Engine
-
-Before any response is returned to the user, a validation engine checks for compliance violations.
-
-Examples of checks include:
-
-* identity disclosure
-* creator integrity
-* restricted phrasing
-* system rule violations
-
-If a violation occurs, the response is rejected.
-
----
-
-# System Architecture
-
-```
-User
- ↓
-Streamlit Interface
- ↓
-FastAPI Backend
- ↓
-Local LLM via Ollama
- ↓
-Deterministic Normalization Layer
- ↓
-Validation Engine
- ↓
-Final Output
-```
-
----
-
-# Components
-
-## FastAPI Backend
-
-Handles:
-
-* AI interaction
-* validation
-* session management
-* file processing
-* report generation
-
-Main endpoints:
-
-```
-POST /ask
-POST /ask_file
-POST /set_mode
-GET  /get_mode
-POST /export_report
-POST /reset
-```
-
----
-
-## Streamlit Interface
-
-Provides a simple UI for interacting with Zynexra.
-
-Features:
-
-* chat interface
-* file uploads (.txt / .pdf)
-* streaming responses
-* execution mode switching
-* downloadable reports
-
----
-
-## Local Model Runtime
-
-Zynexra uses Ollama to run language models locally.
-
-Example models:
-
-```
-qwen2.5:3b-instruct
-qwen2.5:1.5b-instruct
-```
-
-The system automatically falls back to the smaller model if the primary model fails.
-
----
-
-## File Processing
-
-Zynexra supports:
-
-```
-.txt
-.pdf
-```
-
-PDFs are processed using **PyMuPDF** to extract text before analysis.
-
----
-
-# Optional RAG Support
-
-The project includes a retrieval pipeline built with:
-
-* ChromaDB
-* nomic-embed-text embeddings
-
-This allows reference documents to be ingested and retrieved during analysis.
-
-The RAG layer is currently disabled by default.
-
----
-
-# Installation
-
-## 1. Install Ollama
-
-Download from:
-
-https://ollama.com
-
-Pull the model:
-
-```
+```bash
 ollama pull qwen2.5:3b-instruct
+ollama pull qwen2.5:1.5b-instruct    # fallback model
 ```
 
----
+### 2. Configure Environment
 
-## 2. Install Python Dependencies
+Copy or edit `.env` at the project root:
 
+```env
+MODEL_FAST=qwen2.5:3b-instruct
+MODEL_FALLBACK=qwen2.5:1.5b-instruct
+API_HOST=0.0.0.0
+API_PORT=8000
 ```
+
+### 3. Install Python Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
----
+### 4. Install Frontend Dependencies
 
-## 3. Start the API
-
-```
-uvicorn app:app --host 0.0.0.0 --port 8000 --reload
-```
-
----
-
-## 4. Launch the Interface
-
-```
-streamlit run ui_streamlit.py
+```bash
+cd frontend-react
+npm install
 ```
 
 ---
 
-# Usage
+## Running Backend
 
-### Chat Mode
-
-Ask questions directly in the interface.
-
-Example:
-
-```
-Explain risks in this NDA clause
+```bash
+uvicorn backend.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+The API serves at `http://localhost:8000`. Key endpoints:
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/ask` | POST | Send text query (all modes) |
+| `/ask_file` | POST | Upload file for analysis |
+| `/set_mode` | POST | Switch session mode |
+| `/get_mode` | GET | Get current session mode |
+| `/export_report` | POST | Download last report (JSON or text) |
+| `/reset` | POST | Reset session state |
+| `/history` | GET | Browse persisted records |
+| `/history/stats/summary` | GET | Aggregate statistics |
+
 ---
 
-### Document Audit
+## Running Frontend
 
-Upload a contract and Zynexra will generate a structured risk report.
+```bash
+cd frontend-react
+npm run dev
+```
 
-The report can be downloaded using the **Download Last Report** button.
+The React frontend serves at `http://localhost:5173`. It communicates with the backend API at `http://localhost:8000` (configured via `frontend-react/.env`).
 
----
-
-# Project Structure
+### Frontend structure
 
 ```
-app.py
-ui_streamlit.py
-rag.py
-run_regression_tests.py
-requirements.txt
-README.md
+frontend-react/src/
+├── App.tsx                   # Root: state management, mode routing
+├── api.ts                    # API client (audit, advisory, history CRUD)
+├── types.ts                  # TypeScript type definitions
+├── main.tsx                  # Entry point
+├── styles.css                # Global styles
+├── pages/                    # View pages
+│   ├── AuditResultsPage.tsx
+│   ├── RedactionResultsPage.tsx
+│   ├── AdvisoryChatPage.tsx
+│   ├── UploadContractPage.tsx
+│   └── WorkspacePage.tsx
+├── components/               # Reusable UI components
+├── hooks/                    # Custom React hooks
+├── contexts/                 # React contexts (Toast)
+└── utils/                    # Helpers (persistence, logger, formatting)
 ```
 
 ---
 
-# Design Principles
+## Regression Tests
 
-### Privacy First
+```bash
+python tests/regression_runner.py
+```
 
-All processing happens locally.
+Runs 7 tests against the live API (`http://localhost:8000` by default):
 
-### Deterministic AI
+| Test | Input | Pass Criteria |
+|---|---|---|
+| Clean NDA | Standard mutual NDA | Label != LOW, no hallucinated contradictions |
+| Unlimited Indemnity | Clause with uncapped indemnity | Indemnification category found |
+| Garbage OCR | Scrambled noise | Label != HIGH, quality_warning present |
+| Empty File | Zero bytes | issue_count == 0 |
+| Contradictory Clauses | Conflicting terms | Structural Inconsistency found |
+| Non-Legal Text | Cookie recipe | Label != HIGH |
+| Duplicate Spam | Same clause x20+ | issue_count <= 10 |
 
-Post-processing ensures stable and predictable outputs.
-
-### Structured Analysis
-
-Outputs follow a strict format to support legal review workflows.
-
----
-
-# Creator
-
-Zynexra was created by
-
-**Jay Lanjewar**
-in collaboration with
-**Priyani Patil**
+```bash
+python tests/regression_runner.py --url http://192.168.1.100:8000
+```
 
 ---
 
-# Status
+## Architecture Overview
+
+```
+User / Frontend
+       │
+       ▼
+   FastAPI App (app.py)
+       │
+       ├─ SessionManager (in-memory sessions)
+       ├─ ResponseGenerator (Ollama LLM with model fallback)
+       │
+       ▼
+   Normalization Pipeline (normalization_engine.py)
+       │
+       ├─ 1. Parse issues (JSON → text fallback)
+       ├─ 2. Normalize severities (unlimited → CRITICAL, etc.)
+       ├─ 3. Normalize categories (remap + sanitize language)
+       ├─ 4. Suppress duplicates (dedup by quoted text)
+       ├─ 5. Detect contradictions (survival vs category mismatch)
+       ├─ 6. Assess input quality (OCR noise, corruption)
+       ├─ 7. Detect legal domain (keyword ratio, structure score)
+       └─ 8. Compute confidence (6 weighted factors + quality caps)
+               │
+               ▼
+         Response Schema (response_schemas.py)
+               │
+               ▼
+         Validation Engine (validation_engine.py)
+               │
+               ▼
+         SQLite Persistence (db_service.py)
+               │
+               ▼
+         Frontend (React) / Export
+```
+
+### Key Backend Modules
+
+| Module | Purpose |
+|---|---|
+| `backend/engines/confidence_engine.py` | AuditConfidenceScorer, AdvisoryConfidenceScorer |
+| `backend/engines/contradiction_engine.py` | Survival-clause vs category contradictions |
+| `backend/engines/input_quality_engine.py` | 9-factor input quality scoring, hard-degrade caps |
+| `backend/engines/legal_domain_engine.py` | Legal/possibly-legal/non-legal classification |
+| `backend/engines/normalization_engine.py` | Central pipeline: parse, normalize, suppress, build |
+| `backend/engines/redaction_engine.py` | Regex-based PII detection and redaction |
+| `backend/engines/response_schemas.py` | Dataclass schemas, builders, validators |
+| `backend/engines/validation_engine.py` | Identity disclosure and creator-integrity checks |
+| `backend/prompts/` | Mode-specific LLM system prompts |
+| `backend/services/db_service.py` | SQLite persistence (3 tables, legacy repair) |
+| `backend/services/ollama_service.py` | Ollama HTTP client with automatic model fallback |
+
+See `docs/ARCHITECTURE.md` for the full architecture documentation.
+
+---
+
+## Design Principles
+
+- **Privacy First** — All processing is local; no data leaves the machine.
+- **Deterministic** — Post-processing ensures stable, predictable outputs from non-deterministic LLMs.
+- **Structured Analysis** — Outputs follow a strict schema for legal review workflows.
+- **Graceful Degradation** — Quality checks, domain detection, and fallback models ensure the system handles edge cases without hallucination.
+
+---
+
+## Creator
+
+Zynexra was created by **Jay Lanjewar** in collaboration with **Priyani Patil**.
+
+---
+
+## Status
 
 Current stage: **Prototype / Pilot Testing**
-
-The system is functional and designed for local testing and experimentation.

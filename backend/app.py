@@ -32,8 +32,6 @@ from backend.logger import logger
 from backend.prompts import build_execution_prompt
 from backend.services.pdf_service import extract_text_from_pdf
 from backend.utils.timing import log_timing
-# RAG integration temporarily disabled; keep import commented for future use.
-# from backend.rag import query
 
 MODEL_NAME = settings.MODEL_FAST
 # =====================
@@ -808,6 +806,12 @@ def get_history(
             "schema_version": SCHEMA_VERSION
         }
 
+    logger.info(
+        f"[WorkspaceFilter] records_before=0 "
+        f"applied_filters=record_type={record_type},mode={mode},severity={severity},"
+        f"filename={filename},start_date={start_date},end_date={end_date}"
+    )
+
     results = {
         "success": True,
         "records": [],
@@ -818,7 +822,34 @@ def get_history(
     }
 
     try:
-        if record_type in ["audit", "all"]:
+        # Determine which tables to query based on combined record_type and mode filter
+        query_audit = False
+        query_redaction = False
+        query_advisory = False
+
+        if record_type == "all":
+            if mode:
+                upper_mode = mode.upper()
+                if upper_mode == "AUDIT":
+                    query_audit = True
+                elif upper_mode == "REDACTION":
+                    query_audit = True
+                    query_redaction = True
+                elif upper_mode == "ADVISORY":
+                    query_advisory = True
+            else:
+                query_audit = True
+                query_redaction = True
+                query_advisory = True
+        else:
+            if record_type == "audit":
+                query_audit = True
+            elif record_type == "redaction":
+                query_redaction = True
+            elif record_type == "advisory":
+                query_advisory = True
+
+        if query_audit:
             audits = db_service.get_audit_history(
                 limit=limit,
                 offset=offset,
@@ -828,12 +859,17 @@ def get_history(
                 start_date=start_date,
                 end_date=end_date
             )
+            logger.debug(f"[WorkspaceFilter] audit_history returned {len(audits)} records")
             standardized_audits = []
             for audit in audits:
                 standardized_audits.append({
                     "id": audit.get("id"),
                     "filename": audit.get("filename"),
                     "timestamp": audit.get("timestamp"),
+                    "mode": audit.get("mode"),
+                    "severity": audit.get("severity_level"),
+                    "issue_count": audit.get("issue_count"),
+                    "record_type": "audit",
                     "response": build_audit_response(
                         complete_response=audit.get("raw_response", ""),
                         model=MODEL_NAME,
@@ -841,12 +877,9 @@ def get_history(
                         structured_parse_failed=not audit.get("issues")
                     )
                 })
-            if record_type == "audit":
-                results["records"] = standardized_audits
-            else:
-                results["records"].extend(standardized_audits)
+            results["records"].extend(standardized_audits)
 
-        if record_type in ["redaction", "all"]:
+        if query_redaction:
             redactions = db_service.get_redaction_history(
                 limit=limit,
                 offset=offset,
@@ -854,6 +887,7 @@ def get_history(
                 start_date=start_date,
                 end_date=end_date
             )
+            logger.debug(f"[WorkspaceFilter] redaction_history returned {len(redactions)} records")
             standardized_redactions = []
             for redaction in redactions:
                 entities_list = list(redaction.get("entities", {}).values()) if redaction.get("entities") else []
@@ -861,6 +895,10 @@ def get_history(
                     "id": redaction.get("id"),
                     "filename": redaction.get("filename"),
                     "timestamp": redaction.get("timestamp"),
+                    "mode": "REDACTION",
+                    "severity": None,
+                    "redaction_count": redaction.get("redaction_count"),
+                    "record_type": "redaction",
                     "response": build_redaction_response(
                         model=MODEL_NAME,
                         original_text=redaction.get("redacted_text", ""),
@@ -869,13 +907,11 @@ def get_history(
                         fallback_used=False
                     )
                 })
-            if record_type == "redaction":
-                results["records"] = standardized_redactions
-            else:
-                results["records"].extend(standardized_redactions)
+            results["records"].extend(standardized_redactions)
 
-        if record_type in ["advisory", "all"]:
+        if query_advisory:
             advisory = db_service.get_advisory_history(limit=limit, offset=offset)
+            logger.debug(f"[WorkspaceFilter] advisory_sessions returned {len(advisory)} records")
             standardized_advisory = []
             for adv in advisory:
                 messages = adv.get("messages", [])
@@ -890,17 +926,21 @@ def get_history(
                     "session_id": adv.get("session_id"),
                     "title": adv.get("title"),
                     "timestamp": adv.get("timestamp"),
+                    "mode": "ADVISORY",
+                    "severity": None,
+                    "record_type": "advisory",
                     "response": build_advisory_response(
                         complete_response=advisory_text,
                         model=MODEL_NAME
                     )
                 })
-            if record_type == "advisory":
-                results["records"] = standardized_advisory
-            else:
-                results["records"].extend(standardized_advisory)
+            results["records"].extend(standardized_advisory)
 
         results["total"] = len(results["records"])
+        logger.info(
+            f"[WorkspaceFilter] records_after={results['total']} "
+            f"applied_filters=record_type={record_type},mode={mode},severity={severity}"
+        )
         logger.debug(f"[API] Retrieved {results['total']} history records (type={record_type}, mode_filter={mode})")
         logger.debug(f"[History] Workspace fetch -> record_type={record_type}, mode_filter={mode}, total={results['total']}")
         return results

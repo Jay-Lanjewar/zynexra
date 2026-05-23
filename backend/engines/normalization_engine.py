@@ -7,7 +7,6 @@ from backend.logger import logger
 from backend.engines.response_schemas import (
     build_audit_response,
     build_advisory_response,
-    validate_audit_response,
     SCHEMA_VERSION,
 )
 from backend.engines.confidence_engine import audit_scorer, advisory_scorer
@@ -241,7 +240,6 @@ def _assess_quoted_text_quality(text: str) -> bool:
     if not words:
         return True
 
-    import re
     from backend.engines.input_quality_engine import (
         _has_alternating_pattern,
         _has_symbol_burst,
@@ -739,83 +737,6 @@ def normalize_issue_severity(response_text: str) -> str:
         return block
 
     return issue_pattern.sub(lambda m: apply_overrides(m.group(0)), response_text)
-
-def normalize_issue_categories_and_language(response_text: str) -> str:
-    """Normalize category labels and enforce deterministic rewrite safeguards."""
-    if "Issue:" not in response_text:
-        return response_text
-
-    issue_pattern = re.compile(r"(?ims)^Issue:\s*.*?(?=^Issue:\s*|\Z)")
-    category_replacements = {
-        "Indemnification Risk": "Indemnification",
-        "Indemnification Exposure": "Indemnification",
-        "Uncapped Liability": "Indemnification",
-        "Indemnity Concern": "Indemnification",
-        "Structural Conflict": "Structural Inconsistency",
-        "Conflicting Structure": "Structural Inconsistency",
-        "Structural Contradiction": "Structural Inconsistency",
-        "Malformed Structure": "Structural Inconsistency",
-        "Structural Omission": "Structural Inconsistency",
-        "Residuals Risk": "Residuals",
-        "Governing Law Risk": "Governing Law",
-    }
-    unlimited_tokens = re.compile(r"\b(unlimited|uncapped|no cap|no limit)\b", re.IGNORECASE)
-
-    def replace_section(block: str, label: str, new_text: str) -> str:
-        pattern = re.compile(
-            rf"(?is)({re.escape(label)}:\s*)(.*?)(?=\n[A-Z][A-Za-z ]+:\s|$)"
-        )
-        return pattern.sub(lambda m: f"{m.group(1)}{new_text}", block, count=1)
-
-    def apply_normalization(block: str) -> str:
-        # Category normalization
-        for old, new in category_replacements.items():
-            old_block = block
-            block = re.sub(
-                rf"(?im)^(Category:\s*){re.escape(old)}\b",
-                rf"\1{new}",
-                block,
-                count=1
-            )
-            if block != old_block:
-                logger.info("[Normalization] Category remap -> %s -> %s", old, new)
-
-        # Extract fields
-        quoted_match = re.search(
-            r"(?is)Quoted Text:\s*(.*?)(?:\n[A-Z][A-Za-z ]+:\s|$)",
-            block.strip()
-        )
-        risk_match = re.search(
-            r"(?is)(Risk Explanation:\s*)(.*?)(?=\n[A-Z][A-Za-z ]+:\s|$)",
-            block.strip()
-        )
-        suggested_match = re.search(
-            r"(?is)(Suggested Improvement:\s*)(.*?)(?=\n[A-Z][A-Za-z ]+:\s|$)",
-            block.strip()
-        )
-        category_match = re.search(r"(?im)^Category:\s*(.+)", block)
-
-        quoted_text = quoted_match.group(1).strip() if quoted_match else ""
-        suggested_text = suggested_match.group(2).strip() if suggested_match else ""
-        category_text = category_match.group(1).strip() if category_match else ""
-
-        # Confidentiality rewrite safeguard
-        if "CONFIDENTIALITY" in category_text.upper() and suggested_text:
-            if re.search(r"\bterminate\b|\btermination\b|end confidentiality", suggested_text, re.IGNORECASE):
-                corrected = ("Ensure confidentiality obligations survive termination and remain "
-                             "enforceable after contract expiration.")
-                block = replace_section(block, "Suggested Improvement", corrected)
-
-        # Indemnification cap enforcement
-        if "INDEMNIFICATION" in category_text.upper():
-            if unlimited_tokens.search(quoted_text):
-                cap_text = "Introduce a liability cap so indemnification obligations are capped at a defined monetary amount."
-                block = replace_section(block, "Suggested Improvement", cap_text)
-
-        return block
-
-    normalized_text = issue_pattern.sub(lambda m: apply_normalization(m.group(0)), response_text)
-    return suppress_duplicate_quoted_issues(normalized_text)
 
 def normalize_quoted_text_key(quoted_text: str) -> str:
     """Create a stable key for duplicate quoted-text detection."""

@@ -1,22 +1,29 @@
-import { FileSearch, Eraser, MessageSquareText, FolderOpen, Menu, X, ChevronDown } from "lucide-react";
+import { FileSearch, Eraser, MessageSquareText, FolderOpen, LayoutDashboard, Menu, X, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import type { AppMode } from "../types";
 
+type NavMode = AppMode | "WORKSPACE" | "DASHBOARD";
+
 type TopNavigationProps = {
-  currentMode: AppMode | "WORKSPACE";
-  onModeChange: (mode: AppMode | "WORKSPACE") => void;
+  currentMode: NavMode;
+  onModeChange: (mode: NavMode) => void;
 };
 
 const navItems: Array<{
-  value: AppMode | "WORKSPACE";
+  value: NavMode;
   label: string;
   icon: React.ElementType;
 }> = [
+  { value: "DASHBOARD", label: "Home", icon: LayoutDashboard },
   { value: "WORKSPACE", label: "Workspace", icon: FolderOpen },
   { value: "AUDIT", label: "Audit", icon: FileSearch },
   { value: "REDACTION", label: "Redaction", icon: Eraser },
   { value: "ADVISORY", label: "Advisory", icon: MessageSquareText },
 ];
+
+const modeItems = navItems.filter(
+  (item) => item.value === "AUDIT" || item.value === "REDACTION" || item.value === "ADVISORY"
+);
 
 export function TopNavigation({ currentMode, onModeChange }: TopNavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -29,9 +36,21 @@ export function TopNavigation({ currentMode, onModeChange }: TopNavigationProps)
     <nav className="border-b border-slate-200 bg-white" aria-label="Main navigation">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <span className="text-sm font-bold text-slate-900">Zynexra</span>
-            <span className="hidden sm:inline text-slate-400">/</span>
+            <span className="hidden sm:inline text-slate-300 mx-0.5">/</span>
+            <button
+              onClick={() => onModeChange("DASHBOARD")}
+              className={`hidden sm:flex items-center gap-1.5 px-2 py-1 text-sm font-medium rounded-md transition-colors focus-visible:focus-ring ${
+                currentMode === "DASHBOARD"
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              }`}
+              aria-current={currentMode === "DASHBOARD" ? "page" : undefined}
+            >
+              <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
+              Home
+            </button>
             <button
               onClick={() => onModeChange("WORKSPACE")}
               className={`hidden sm:flex items-center gap-1.5 px-2 py-1 text-sm font-medium rounded-md transition-colors focus-visible:focus-ring ${
@@ -60,7 +79,7 @@ export function TopNavigation({ currentMode, onModeChange }: TopNavigationProps)
           </div>
 
           <div className="hidden lg:flex items-center gap-1" role="tablist" aria-label="Mode selection">
-            {navItems.slice(1).map((item) => {
+            {modeItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentMode === item.value;
               return (

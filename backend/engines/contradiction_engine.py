@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Set
 import re
 
 from backend.logger import logger
@@ -16,6 +16,12 @@ SURVIVAL_PHRASES = [
     re.compile(r"(?i)\bprovisions?\s+.*\bsurvive\b"),
     re.compile(r"(?i)\bterms?\s+.*\bsurvive\b"),
     re.compile(r"(?i)\bcontinues?\s+after\s+termination\b"),
+]
+
+TERMINATION_PHRASES = [
+    re.compile(r"(?i)\b(?:cease|shall\s+not\s+survive|shall\s+not\s+continue|shall\s+not\s+remain|no\s+longer\s+bound)\b"),
+    re.compile(r"(?i)\bimmediately\s+(?:cease|terminate|end)\b"),
+    re.compile(r"(?i)\b(?:terminates?\s+immediately|termination\s+of\s+.*\s+obligations)\b"),
 ]
 
 PROHIBITED_CATEGORIES = {
@@ -40,6 +46,30 @@ DURATION_INSUFFICIENCY_CUES = [
     re.compile(r"(?i)\b(?:continues\s+(?:indefinitely|forever|perpetually)|no\s+end\s+to\s+obligations)"),
 ]
 
+OBLIGATION_DOMAIN_PATTERNS = [
+    re.compile(r"(?i)\bconfidential"),
+    re.compile(r"(?i)\bproprietary"),
+    re.compile(r"(?i)\bnon-?disclos"),
+    re.compile(r"(?i)\bnda\b"),
+    re.compile(r"(?i)\bnon-?compete"),
+    re.compile(r"(?i)\bcompetition"),
+    re.compile(r"(?i)\brestrictive\s+covenant"),
+    re.compile(r"(?i)\bgoverning\s+law"),
+    re.compile(r"(?i)\bchoice\s+of\s+law"),
+    re.compile(r"(?i)\bjurisdiction"),
+    re.compile(r"(?i)\bvenue\b"),
+    re.compile(r"(?i)\bindemnif"),
+    re.compile(r"(?i)\bhold\s+harmless"),
+    re.compile(r"(?i)\bentire\s+agreement"),
+    re.compile(r"(?i)\bmerger\b"),
+    re.compile(r"(?i)\bintegration\s+clause"),
+    re.compile(r"(?i)\bsupersed"),
+    re.compile(r"(?i)\bsurviv"),
+    re.compile(r"(?i)\bpost-?termination"),
+    re.compile(r"(?i)\bterminat(?:e|ion|ing)"),
+    re.compile(r"(?i)\bexpir"),
+]
+
 
 @dataclass
 class ContradictionResult:
@@ -51,6 +81,7 @@ class ContradictionResult:
     risk_explanation: str
     reason: str
     suppressed: bool = False
+    document_level_conflict: bool = False
 
     def to_dict(self):
         return {
@@ -62,6 +93,7 @@ class ContradictionResult:
             "risk_explanation": self.risk_explanation,
             "reason": self.reason,
             "suppressed": self.suppressed,
+            "document_level_conflict": self.document_level_conflict,
         }
 
 
@@ -69,6 +101,12 @@ def _has_survival_language(text: str) -> bool:
     if not text:
         return False
     return any(pattern.search(text) for pattern in SURVIVAL_PHRASES)
+
+
+def _has_termination_language(text: str) -> bool:
+    if not text:
+        return False
+    return any(pattern.search(text) for pattern in TERMINATION_PHRASES)
 
 
 def _is_prohibited_category(category: str) -> bool:
@@ -110,16 +148,85 @@ def _check_semantic_contradiction(quoted_text: str, risk_explanation: str) -> bo
     return False
 
 
+def _extract_obligation_domains(text: str) -> Set[str]:
+    if not text:
+        return set()
+    domains: Set[str] = set()
+    for pattern in OBLIGATION_DOMAIN_PATTERNS:
+        if pattern.search(text):
+            domains.add(pattern.pattern)
+    return domains
+
+
+def _find_document_level_conflicts(issues: list) -> Set[int]:
+    survival_indices: List[int] = []
+    termination_indices: List[int] = []
+
+    for idx, issue in enumerate(issues):
+        quoted = issue.quoted_text or ""
+        if _has_survival_language(quoted):
+            survival_indices.append(idx)
+        if _has_termination_language(quoted):
+            termination_indices.append(idx)
+
+    if not survival_indices or not termination_indices:
+        return set()
+
+    conflict_indices: Set[int] = set()
+    for s_idx in survival_indices:
+        s_issue = issues[s_idx]
+        s_text = ((s_issue.category or "") + " " + (s_issue.quoted_text or "") + " " + (s_issue.risk_explanation or ""))
+        s_domains = _extract_obligation_domains(s_text)
+
+        for t_idx in termination_indices:
+            if s_idx == t_idx:
+                continue
+            t_issue = issues[t_idx]
+            t_text = ((t_issue.category or "") + " " + (t_issue.quoted_text or "") + " " + (t_issue.risk_explanation or ""))
+            t_domains = _extract_obligation_domains(t_text)
+
+            if s_domains & t_domains:
+                conflict_indices.add(s_idx)
+                conflict_indices.add(t_idx)
+
+    return conflict_indices
+
+
 def validate_contradictions(issues: list) -> List[ContradictionResult]:
     results: List[ContradictionResult] = []
+
+    document_conflict_indices = _find_document_level_conflicts(issues)
+
+    conflict_found = len(document_conflict_indices) > 0
+    logger.info(
+        "[ContradictionDetection] contradiction_found=%s document_level_conflict_count=%d issue_indices=%s",
+        conflict_found, len(document_conflict_indices),
+        sorted(document_conflict_indices) if document_conflict_indices else "[]"
+    )
 
     for idx, issue in enumerate(issues):
         quoted = issue.quoted_text or ""
         category = issue.category or ""
         risk = issue.risk_explanation or ""
 
+        is_document_level = idx in document_conflict_indices
+
+        if is_document_level:
+            logger.info(
+                "[ContradictionSuppression] document_level_conflict=True issue=%d category='%s' - keeping valid contradiction (contradictory clauses exist document-wide)",
+                idx, category
+            )
+
         if _has_survival_language(quoted) and _is_prohibited_category(category):
             if not _references_duration_insufficiency(risk):
+                if is_document_level:
+                    logger.info(
+                        "[ContradictionDetection] survival_category_mismatch detected issue=%d category='%s' "
+                        "but document_level_conflict=True - NOT suppressing",
+                        idx, category
+                    )
+                    continue
+
                 result = ContradictionResult(
                     has_contradiction=True,
                     issue_index=idx,
@@ -131,12 +238,20 @@ def validate_contradictions(issues: list) -> List[ContradictionResult]:
                 )
                 results.append(result)
                 logger.warning(
-                    "[Contradiction] Issue %d: survival-category contradiction detected. Category='%s' vs survival language in quoted text. Reason: %s",
-                    idx, category, result.reason,
+                    "[ContradictionSuppression] suppressed_reason=survival_category_mismatch issue=%d category='%s'",
+                    idx, category
                 )
                 continue
 
         if _check_semantic_contradiction(quoted, risk):
+            if is_document_level:
+                logger.info(
+                    "[ContradictionDetection] semantic_contradiction detected issue=%d "
+                    "but document_level_conflict=True - NOT suppressing",
+                    idx
+                )
+                continue
+
             result = ContradictionResult(
                 has_contradiction=True,
                 issue_index=idx,
@@ -148,8 +263,8 @@ def validate_contradictions(issues: list) -> List[ContradictionResult]:
             )
             results.append(result)
             logger.warning(
-                "[Contradiction] Issue %d: semantic contradiction detected. Quoted text has survival language but risk explanation implies termination or absence.",
-                idx,
+                "[ContradictionSuppression] suppressed_reason=semantic_mismatch issue=%d",
+                idx
             )
 
     return results
@@ -159,7 +274,7 @@ def apply_contradiction_suppression(issues: list, contradictions: List[Contradic
     if not contradictions:
         return issues
 
-    suppressed_indices = {c.issue_index for c in contradictions if c.has_contradiction}
+    suppressed_indices = {c.issue_index for c in contradictions if c.has_contradiction and not c.suppressed}
 
     kept_issues = []
     for idx, issue in enumerate(issues):
@@ -168,13 +283,15 @@ def apply_contradiction_suppression(issues: list, contradictions: List[Contradic
                 if c.issue_index == idx:
                     c.suppressed = True
             logger.info(
-                "[Contradiction] Suppressing issue %d due to contradiction: %s",
-                idx, c.contradiction_type,
+                "[ContradictionSuppression] Suppressing issue %d - kept_after=%d",
+                idx, len(kept_issues)
             )
         else:
             kept_issues.append(issue)
 
     if suppressed_indices:
-        logger.info("[Contradiction] Total issues suppressed -> %d", len(suppressed_indices))
+        logger.info("[ContradictionSuppression] Total issues suppressed -> %d", len(suppressed_indices))
+    else:
+        logger.info("[ContradictionSuppression] No issues suppressed")
 
     return kept_issues

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { askAdvisoryQuestion, auditContractFile, type ApiError, getHistoryRecords } from "./api";
 import { AdvisoryChatPage } from "./pages/AdvisoryChatPage";
 import { AuditResultsPage } from "./pages/AuditResultsPage";
+import { DashboardPage } from "./pages/DashboardPage";
 import { RedactionResultsPage } from "./pages/RedactionResultsPage";
 import { UploadContractPage } from "./pages/UploadContractPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
@@ -15,10 +16,10 @@ import { persistence, type PersistedAppState, type PersistedAdvisory } from "./u
 import { logger, logApiError } from "./utils/logger";
 import type { AppMode, AuditResponse, ChatMessage, RedactionOptions, HistoryRecord } from "./types";
 
-type AppState = AppMode | "WORKSPACE";
+type AppState = AppMode | "WORKSPACE" | "DASHBOARD";
 
 function AppContent() {
-  const [appState, setAppState] = useState<AppState>("AUDIT");
+  const [appState, setAppState] = useState<AppState>("DASHBOARD");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [result, setResult] = useState<AuditResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -202,9 +203,9 @@ function AppContent() {
     handleAdvisorySend(true);
   }, []);
 
-  function handleModeChange(mode: AppMode | "WORKSPACE") {
-    if (mode !== "WORKSPACE") {
-      setSelectedMode(mode as AppMode);
+  function handleModeChange(mode: AppMode | "WORKSPACE" | "DASHBOARD") {
+    if (mode === "AUDIT" || mode === "REDACTION" || mode === "ADVISORY") {
+      setSelectedMode(mode);
     }
     setResult(null);
     setError(null);
@@ -216,6 +217,16 @@ function AppContent() {
   function handleRecordOpen(record: HistoryRecord, result: AuditResponse) {
     setResult(result);
     setAppState(result.mode || "AUDIT");
+  }
+
+  // Dashboard view (new landing)
+  if (appState === "DASHBOARD") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <TopNavigation currentMode="DASHBOARD" onModeChange={handleModeChange} />
+        <DashboardPage onModeChange={handleModeChange} />
+      </div>
+    );
   }
 
   // Workspace view
@@ -287,10 +298,10 @@ function AppContent() {
     );
   }
 
-  // Upload/main view
+  // Upload/main view (AUDIT or REDACTION without results)
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <TopNavigation currentMode="AUDIT" onModeChange={handleModeChange} />
+      <TopNavigation currentMode={appState as AppMode} onModeChange={handleModeChange} />
       <UploadContractPage
         error={error}
         isLoading={isLoading}

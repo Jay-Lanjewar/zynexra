@@ -11,7 +11,7 @@ const STORAGE_KEYS = {
 } as const;
 
 export type PersistedAppState = {
-  mode: AppMode | "WORKSPACE";
+  mode: AppMode | "WORKSPACE" | "DASHBOARD";
   selectedMode: AppMode;
   redactionOptions: {
     emails: boolean;

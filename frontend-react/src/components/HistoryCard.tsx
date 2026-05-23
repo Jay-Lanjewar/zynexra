@@ -39,15 +39,17 @@ function formatDate(timestamp?: string): string {
   if (!timestamp) return "Unknown";
   try {
     const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return "Invalid date";
     return date.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      timeZoneName: "short",
     });
   } catch {
-    return timestamp;
+    return timestamp || "Unknown";
   }
 }
 
