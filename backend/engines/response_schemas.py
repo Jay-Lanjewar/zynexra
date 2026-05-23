@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, List, Optional
 from enum import Enum
+import time
 
 from backend.logger import logger
 
@@ -254,7 +255,12 @@ def build_audit_response(
 
     response_dict = response.to_dict()
 
-    if not validate_audit_response(response_dict):
+    sv_start = time.time()
+    schema_valid = validate_audit_response(response_dict)
+    sv_ms = (time.time() - sv_start) * 1000
+    logger.info("[Perf] schema_validation_ms=%.0f", sv_ms)
+
+    if not schema_valid:
         logger.warning("[Schema] Built audit response failed validation, returning legacy format")
         return {
             "success": True,

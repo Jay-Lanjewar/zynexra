@@ -82,7 +82,7 @@ export function ExportButtons({ result, fileName = "audit-report" }: ExportButto
       <button
         type="button"
         onClick={handleExportJson}
-        className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+        className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700"
       >
         <FileJson className="h-4 w-4" />
         JSON
@@ -90,7 +90,7 @@ export function ExportButtons({ result, fileName = "audit-report" }: ExportButto
       <button
         type="button"
         onClick={handleExportText}
-        className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+        className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700"
       >
         <FileText className="h-4 w-4" />
         Text
@@ -98,7 +98,7 @@ export function ExportButtons({ result, fileName = "audit-report" }: ExportButto
       <button
         type="button"
         onClick={handleExportJson}
-        className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+        className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700"
       >
         <Download className="h-4 w-4" />
       </button>

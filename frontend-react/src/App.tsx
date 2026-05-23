@@ -8,6 +8,7 @@ import { UploadContractPage } from "./pages/UploadContractPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 import { TopNavigation } from "./components/TopNavigation";
 import { ToastProvider, useToast } from "./contexts/ToastContext";
+import { AuditLoadingWorkflow } from "./components/AuditLoadingWorkflow";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { RetryButton } from "./components/RetryButton";
@@ -276,7 +277,7 @@ function AppContent() {
   // Audit results view
   if (result || apiError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen bg-slate-950">
         <TopNavigation currentMode={result?.mode || "AUDIT"} onModeChange={handleModeChange} />
         <AuditResultsPage
           result={result}
@@ -295,6 +296,16 @@ function AppContent() {
           </div>
         )}
       </div>
+    );
+  }
+
+  // Loading workflow view
+  if (isLoading) {
+    return (
+      <AuditLoadingWorkflow
+        filename={selectedFile?.name ?? ""}
+        mode={appState as AppMode}
+      />
     );
   }
 

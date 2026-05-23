@@ -9,21 +9,21 @@ type ConfidenceBadgeProps = {
 
 const labelConfig: Record<ConfidenceLabel, { bg: string; text: string; dot: string; tooltip: string }> = {
   HIGH: {
-    bg: "bg-emerald-100",
-    text: "text-emerald-700",
-    dot: "bg-emerald-500",
+    bg: "bg-emerald-500/10",
+    text: "text-emerald-400",
+    dot: "bg-emerald-400",
     tooltip: "High confidence: Strong structured output with complete analysis",
   },
   MEDIUM: {
-    bg: "bg-amber-100",
-    text: "text-amber-700",
-    dot: "bg-amber-500",
+    bg: "bg-amber-500/10",
+    text: "text-amber-400",
+    dot: "bg-amber-400",
     tooltip: "Medium confidence: Partial analysis or fallback parsing used",
   },
   LOW: {
-    bg: "bg-red-100",
-    text: "text-red-700",
-    dot: "bg-red-500",
+    bg: "bg-red-500/10",
+    text: "text-red-400",
+    dot: "bg-red-400",
     tooltip: "Low confidence: Weak response quality, review results carefully",
   },
 };
@@ -43,7 +43,7 @@ export function ConfidenceBadge({ confidence, label, showPercentage = true, size
     >
       <span className={`h-2 w-2 rounded-full ${config.dot} opacity-70`}></span>
       {showPercentage && percentage !== null ? `${percentage}%` : resolvedLabel}
-      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-xs font-normal text-white opacity-0 transition-opacity group-hover:block group-hover:opacity-100">
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-xs font-normal text-slate-200 opacity-0 transition-opacity group-hover:block group-hover:opacity-100">
         {config.tooltip}
       </span>
     </span>

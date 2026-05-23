@@ -15,10 +15,10 @@ PREVIOUS_GENERATION_OPTIONS = {
 }
 GENERATION_PROFILES = {
     "AUDIT": {
-        # Keep AUDIT identical to the previous shared config for regression stability.
-        "num_predict": 512,
+        # Optimized: reduced budget and context for sub-10s latency.
+        "num_predict": 192,
         "temperature": 0.1,
-        "num_ctx": 3072,
+        "num_ctx": 2048,
     },
     "REDACTION": {
         "num_predict": 768,
@@ -96,10 +96,15 @@ class OllamaService:
         """Generate complete response from a specific model in single pass."""
         inference_start = None
         profile_name, generation_options = self._get_generation_options(mode)
+        if profile_name == "AUDIT":
+            logger.info(
+                "[InferenceOptimization] num_predict_reduced=%s",
+                generation_options.get("num_predict")
+            )
         try:
             # Single model call - no retries
             inference_start = time.time()
-            logger.info("[Inference] Using generation profile -> %s", profile_name)
+            logger.info("[Inference] Using generation profile -> %s options=%s", profile_name, generation_options)
             stream = ollama_client.chat(
                 model=model,
                 messages=messages,

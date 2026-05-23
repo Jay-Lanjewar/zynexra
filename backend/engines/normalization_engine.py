@@ -2,6 +2,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 import json
 import re
+import time
 
 from backend.logger import logger
 from backend.engines.response_schemas import (
@@ -143,28 +144,157 @@ def coerce_audit_issue(raw_issue: Dict[str, Any]) -> AuditIssue:
 
     return AuditIssue(**normalized, extra_fields=extra_fields)
 
+def _sanitize_json_strings(text: str) -> str:
+    """Escape unescaped control characters (newlines, tabs, carriage returns) inside JSON string contexts."""
+    result = []
+    in_string = False
+    escaped = False
+    for ch in text:
+        if escaped:
+            result.append(ch)
+            escaped = False
+            continue
+        if ch == '\\':
+            result.append(ch)
+            escaped = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            result.append(ch)
+            continue
+        if in_string:
+            if ch == '\n':
+                result.append('\\n')
+            elif ch == '\r':
+                result.append('\\r')
+            elif ch == '\t':
+                result.append('\\t')
+            elif ord(ch) < 32:
+                result.append(f'\\u{ord(ch):04x}')
+            else:
+                result.append(ch)
+        else:
+            result.append(ch)
+    return ''.join(result)
+
+def repair_json(text: str) -> Optional[str]:
+    """Repair truncated/malformed JSON: unterminated strings, trailing commas, missing closers."""
+    if not text or not text.strip():
+        return None
+    s = text.strip()
+    fenced_match = re.match(r"```(?:json)?\s*(.*?)\s*(?:```)?\s*$", s, re.DOTALL | re.IGNORECASE)
+    if fenced_match:
+        s = fenced_match.group(1).strip()
+    start = -1
+    for i, ch in enumerate(s):
+        if ch in '{[':
+            start = i
+            break
+    if start < 0:
+        return None
+    s = s[start:]
+    # Sanitize literal control characters inside JSON strings first
+    sanitized = _sanitize_json_strings(s)
+    if sanitized != s:
+        s = sanitized
+        # re-check start after sanitization (should be same but safe)
+        start = -1
+        for i, ch in enumerate(s):
+            if ch in '{[':
+                start = i
+                break
+        if start < 0:
+            return None
+        s = s[start:]
+    changes = {}
+    new_s = re.sub(r',\s*([}\]])', r'\1', s)
+    if new_s != s:
+        changes['trailing_comma'] = True
+        s = new_s
+    # Stack-based approach to detect unterminated strings and missing closers
+    stack = []
+    in_string = False
+    string_start = -1
+    i = 0
+    while i < len(s):
+        ch = s[i]
+        if ch == '\\':
+            i += 2
+            continue
+        if ch == '"':
+            if not in_string:
+                string_start = i
+            in_string = not in_string
+            i += 1
+            continue
+        if not in_string:
+            if ch == '{':
+                stack.append('{')
+            elif ch == '[':
+                stack.append('[')
+            elif ch == '}':
+                if stack and stack[-1] == '{':
+                    stack.pop()
+            elif ch == ']':
+                if stack and stack[-1] == '[':
+                    stack.pop()
+        i += 1
+    if in_string:
+        ctx = ''
+        for j in range(string_start - 1, -1, -1):
+            if s[j] not in ' \t\n\r':
+                ctx = s[j]
+                break
+        if ctx in '{,':
+            s = s + '":""'
+            changes['unterminated_key'] = True
+        else:
+            s = s + '"'
+            changes['unterminated_string'] = True
+        in_string = False
+    if stack:
+        closing = ''.join('}' if c == '{' else ']' for c in reversed(stack))
+        s = s.rstrip() + closing
+        changes['missing_brace'] = True
+    for change in changes:
+        logger.info("[StructuredRepair] repaired_%s=True", change)
+    return s if changes else None
+
 def extract_json_payload_candidates(response_text: str) -> List[str]:
-    candidates = [response_text.strip()]
-    fenced_matches = re.findall(r"```(?:json)?\s*(.*?)```", response_text, re.IGNORECASE | re.DOTALL)
-    candidates.extend(match.strip() for match in fenced_matches if match.strip())
+    stripped = response_text.strip()
+    has_json_indicators = bool(re.search(r'[\[{]', stripped))
+    if not has_json_indicators:
+        return []
+
+    candidates = []
+    if stripped:
+        candidates.append(stripped)
+
+    fenced_matches = re.findall(r"```(?:json)?\s*(.*?)```", stripped, re.IGNORECASE | re.DOTALL)
+    for match in fenced_matches:
+        trimmed = match.strip()
+        if trimmed and trimmed not in candidates:
+            candidates.append(trimmed)
+
+    leading_candidates = re.findall(r'^\s*([\[\{].*?[\]\}])\s*$', stripped, re.DOTALL)
+    for match in leading_candidates:
+        trimmed = match.strip()
+        if trimmed and trimmed not in candidates:
+            candidates.append(trimmed)
 
     decoder = json.JSONDecoder()
-    for index, char in enumerate(response_text):
+    for index, char in enumerate(stripped):
         if char not in "[{":
             continue
         try:
-            _, end = decoder.raw_decode(response_text[index:])
+            _, end = decoder.raw_decode(stripped[index:])
         except json.JSONDecodeError:
             continue
-        candidates.append(response_text[index:index + end].strip())
+        candidate = stripped[index:index + end].strip()
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
 
-    unique_candidates = []
-    seen = set()
-    for candidate in candidates:
-        if candidate and candidate not in seen:
-            unique_candidates.append(candidate)
-            seen.add(candidate)
-    return unique_candidates
+    return candidates
 
 def audit_issues_from_json_payload(payload: Any) -> List[AuditIssue]:
     if isinstance(payload, dict):
@@ -196,6 +326,7 @@ def parse_audit_issues_from_json(response_text: str) -> List[AuditIssue]:
             continue
         issues = audit_issues_from_json_payload(payload)
         if issues:
+            logger.info("[Structured] JSON parse success -> %d issues", len(issues))
             return issues
     return []
 
@@ -229,19 +360,89 @@ def parse_audit_issues_from_text(response_text: str) -> List[AuditIssue]:
             issues.append(issue)
     return issues
 
+def _try_parse_json(text: str) -> Optional[List[AuditIssue]]:
+    """Try to parse JSON from text, with repair and progressive truncation."""
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        payload = None
+    if payload is not None:
+        issues = audit_issues_from_json_payload(payload)
+        if issues:
+            return issues
+    repaired = repair_json(text)
+    if repaired is not None:
+        try:
+            payload = json.loads(repaired)
+        except json.JSONDecodeError:
+            payload = None
+        if payload is not None:
+            issues = audit_issues_from_json_payload(payload)
+            if issues:
+                return issues
+    return None
+
 def parse_audit_issues(response_text: str) -> List[AuditIssue]:
+    # Sanitize unescaped control characters so JSON parsing doesn't choke
+    response_text = _sanitize_json_strings(response_text)
     issues = parse_audit_issues_from_json(response_text)
     if issues:
-        logger.info("[Structured] Parsed issue count -> %s", len(issues))
+        logger.info(
+            "[StructuredOutcome] strict_json_success=True repair_success=False "
+            "fallback_used=False issues_extracted=%d",
+            len(issues)
+        )
+        return issues
+
+    # Repair loop: try repair_json on each candidate
+    for candidate in extract_json_payload_candidates(response_text):
+        result = _try_parse_json(candidate)
+        if result is not None:
+            issues = result
+            logger.info("[StructuredRepair] recovery_success=True")
+            break
+
+    if issues:
+        logger.info(
+            "[StructuredOutcome] strict_json_success=False repair_success=True "
+            "fallback_used=False issues_extracted=%d",
+            len(issues)
+        )
+        return issues
+
+    # Progressive truncation: try truncating at last complete } or ]
+    for candidate in extract_json_payload_candidates(response_text):
+        stripped = candidate.rstrip()
+        for close_char in ['}', ']']:
+            pos = stripped.rfind(close_char)
+            if pos >= len(stripped) // 2:
+                prefix = stripped[:pos + 1]
+                result = _try_parse_json(prefix)
+                if result is not None:
+                    issues = result
+                    logger.info("[StructuredRepair] recovery_success=True")
+                    break
+        if issues:
+            break
+
+    if issues:
+        logger.info(
+            "[StructuredOutcome] strict_json_success=False repair_success=True "
+            "fallback_used=False issues_extracted=%d",
+            len(issues)
+        )
         return issues
 
     logger.warning("[Structured] Fallback to text parsing triggered")
     issues = parse_audit_issues_from_text(response_text)
-    if issues:
-        logger.info("[Structured] Parsed issue count -> %s", len(issues))
-        return issues
+    fallback_used = len(issues) > 0
 
-    return []
+    logger.info(
+        "[StructuredOutcome] strict_json_success=False repair_success=False "
+        "fallback_used=%s issues_extracted=%d",
+        fallback_used, len(issues)
+    )
+    return issues
 
 def is_json_response_mode(response_format: Optional[str]) -> bool:
     return str(response_format or "").strip().lower() == "json"
@@ -308,12 +509,25 @@ def _assess_quoted_text_quality(text: str) -> bool:
     return malformed_ratio > 0.20 or symbol_density > 0.25
 
 
-def build_audit_json_payload(complete_response: str, model: str, user_input: str = "", fallback_used: bool = False) -> Dict[str, Any]:
-    """Build a machine-readable audit response while retaining text fallback."""
+def build_audit_json_payload(
+    complete_response: str,
+    model: str,
+    user_input: str = "",
+    fallback_used: bool = False,
+    inference_duration_ms: float = 0,
+) -> Dict[str, Any]:
+    """Build a machine-readable audit response with single-pass processing."""
     logger.info("[FallbackTrace] stage=build_audit_json_payload_entry fallback_used=%s", fallback_used)
+    pipeline_start = time.time()
+
+    # --- Parse ---
+    parse_start = time.time()
     issues = parse_audit_issues(complete_response)
     parse_failed = len(issues) == 0
+    parse_ms = (time.time() - parse_start) * 1000
 
+    # --- Normalization ---
+    norm_start = time.time()
     duplicate_suppressed = 0
     if not parse_failed:
         original_count = len(issues)
@@ -331,11 +545,16 @@ def build_audit_json_payload(complete_response: str, model: str, user_input: str
                 "[ContradictionClassification] Elevated %d issue(s) to Structural Inconsistency in pipeline",
                 elevated_count
             )
+    normalization_ms = (time.time() - norm_start) * 1000
 
+    # --- Input Quality ---
+    quality_start = time.time()
     quality_result = assess_input_quality(user_input)
     input_quality_degraded = quality_result.is_degraded
     quality_warning = INPUT_QUALITY_WARNING if input_quality_degraded else ""
+    quality_ms = (time.time() - quality_start) * 1000
 
+    # --- Semantic Suppression ---
     semantic_suppressed = False
     if fallback_used and input_quality_degraded and _assess_quoted_text_quality(user_input):
         semantic_suppressed = True
@@ -346,6 +565,8 @@ def build_audit_json_payload(complete_response: str, model: str, user_input: str
         parse_failed = True
         complete_response = SEMANTIC_SUPPRESSION_MESSAGE
 
+    # --- Domain Detection ---
+    domain_start = time.time()
     domain_suppressed = False
     if user_input and not semantic_suppressed:
         domain_result = compute_document_domain_confidence(user_input)
@@ -365,7 +586,10 @@ def build_audit_json_payload(complete_response: str, model: str, user_input: str
             complete_response = DOMAIN_SUPPRESSION_MESSAGE
     else:
         domain_metadata = {}
+    domain_ms = (time.time() - domain_start) * 1000
 
+    # --- Confidence ---
+    confidence_start = time.time()
     confidence_result = audit_scorer.compute(
         response_text=complete_response,
         issue_count=len(issues),
@@ -382,10 +606,29 @@ def build_audit_json_payload(complete_response: str, model: str, user_input: str
             "[DomainDetection] Confidence capped: score=%.2f label=%s",
             confidence_result.score, confidence_result.label,
         )
+    confidence_ms = (time.time() - confidence_start) * 1000
+
+    total_ms = (time.time() - pipeline_start) * 1000
+
+    # --- Perf logs ---
+    logger.info("[Perf] inference_ms=%.0f", inference_duration_ms)
+    logger.info("[Perf] parse_ms=%.0f", parse_ms)
+    logger.info("[Perf] normalization_ms=%.0f", normalization_ms)
+    logger.info("[Perf] quality_ms=%.0f", quality_ms)
+    logger.info("[Perf] domain_ms=%.0f", domain_ms)
+    logger.info("[Perf] confidence_ms=%.0f", confidence_ms)
+    logger.info("[Perf] total_ms=%.0f", total_ms)
+
+    # --- OptimizationSummary ---
+    logger.info(
+        "[OptimizationSummary] fallback_used=%s duplicate_rebuilds_eliminated=True "
+        "structured_parse_success=%s total_ms=%.0f",
+        fallback_used, not parse_failed, total_ms + inference_duration_ms,
+    )
 
     metadata = {
         "model_name": model,
-        "inference_duration_ms": 0,
+        "inference_duration_ms": round(inference_duration_ms),
         "parser_used": "json" if not parse_failed else "text",
         "fallback_used": fallback_used,
         "semantic_suppressed": semantic_suppressed,
@@ -411,7 +654,6 @@ def build_audit_json_payload(complete_response: str, model: str, user_input: str
             metadata=metadata,
         )
 
-    logger.info("[API] Returning structured issue payload")
     return build_audit_response(
         complete_response=complete_response,
         model=model,
@@ -423,12 +665,24 @@ def build_audit_json_payload(complete_response: str, model: str, user_input: str
         metadata=metadata,
     )
 
-def build_mode_json_payload(complete_response: str, model: str, mode: str, user_query: str = "", fallback_used: bool = False) -> Dict[str, Any]:
+def build_mode_json_payload(
+    complete_response: str,
+    model: str,
+    mode: str,
+    user_query: str = "",
+    fallback_used: bool = False,
+    inference_duration_ms: float = 0,
+) -> Dict[str, Any]:
     """Build mode-aware JSON while preserving legacy text compatibility."""
     logger.info("[FallbackTrace] stage=build_mode_json_payload_entry fallback_used=%s mode=%s", fallback_used, mode)
     normalized_mode = (mode or "AUDIT").upper()
     if normalized_mode == "AUDIT":
-        return build_audit_json_payload(complete_response, model, user_input=user_query, fallback_used=fallback_used)
+        return build_audit_json_payload(
+            complete_response, model,
+            user_input=user_query,
+            fallback_used=fallback_used,
+            inference_duration_ms=inference_duration_ms,
+        )
 
     if normalized_mode == "ADVISORY":
         quality_result = assess_input_quality(user_query)

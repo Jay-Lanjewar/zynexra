@@ -335,12 +335,16 @@ def ask(q: Query, response_format: Optional[str] = None):
     log_timing("Prompt build", prompt_start)
 
     if json_response_mode:
+        inference_start = time.time()
         try:
             raw_response, fallback_used = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
+            inference_duration_ms = (time.time() - inference_start) * 1000
+            logger.info("[Perf] inference_ms=%.0f", inference_duration_ms)
             logger.info("[FallbackTrace] stage=app_json_response_handoff fallback_used=%s", fallback_used)
             normalization_start = time.time()
             complete_response = normalize_audit_response(raw_response, session["mode"])
-            log_timing("Normalization", normalization_start)
+            norm_ms = (time.time() - normalization_start) * 1000
+            logger.info("[Perf] normalization_ms=%.0f", norm_ms)
             if should_debug_regression_case(q.session_id, q.task_anchor, text):
                 log_regression_debug(raw_response, complete_response)
         except HTTPException as http_err:
@@ -357,17 +361,20 @@ def ask(q: Query, response_format: Optional[str] = None):
             )
             validation_start = time.time()
             validation_result = validation_engine.validate_response(complete_response, validation_context)
+            validation_ms = (time.time() - validation_start) * 1000
             log_timing("Validation", validation_start)
         except Exception as e:
             logger.error("Validation error during /ask. session_id=%s error=%s", q.session_id, e)
             raise HTTPException(500, f"Validation error: {str(e)}")
 
+        total_ms = (time.time() - request_start) * 1000
         log_timing("Total request", request_start)
+        logger.info("[Perf] total_ms=%.0f", total_ms)
 
         if validation_result.is_valid:
             session["last_report"] = complete_response
             logger.info("[FallbackTrace] stage=app_build_audit_payload fallback_used=%s", fallback_used)
-            structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used)
+            structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms)
             if fallback_used:
                 structured["fallback_used"] = True
                 if "metadata" in structured:
@@ -378,7 +385,7 @@ def ask(q: Query, response_format: Optional[str] = None):
             if sessions.should_update_history(validation_result):
                 sessions.add_valid_exchange(q.session_id, text, complete_response)
 
-            # Persist to database based on mode
+            # Persist to database based on mode (reuse structured payload - no duplicate rebuild)
             try:
                 if db_service.available:
                     if session["mode"] == "ADVISORY":
@@ -391,9 +398,8 @@ def ask(q: Query, response_format: Optional[str] = None):
                         )
                         logger.debug(f"[History] Saving record -> mode={session['mode']}, session_id={q.session_id}")
                     else:
-                        payload = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used)
-                        issue_count = payload.get("issue_count", 0)
-                        issues = payload.get("issues", [])
+                        issue_count = structured.get("issue_count", 0)
+                        issues = structured.get("issues", [])
                         record_id = db_service.insert_audit(
                             filename="text_input",
                             issue_count=issue_count,
@@ -421,11 +427,15 @@ def ask(q: Query, response_format: Optional[str] = None):
         yield ""
         # Always try fast model first. ResponseGenerator handles fallback internally.
         try:
+            inference_start = time.time()
             raw_response, fallback_used = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
+            inference_duration_ms = (time.time() - inference_start) * 1000
+            logger.info("[Perf] inference_ms=%.0f", inference_duration_ms)
             logger.info("[FallbackTrace] stage=app_streaming_response_handoff fallback_used=%s", fallback_used)
             normalization_start = time.time()
             complete_response = normalize_audit_response(raw_response, session["mode"])
-            log_timing("Normalization", normalization_start)
+            norm_ms = (time.time() - normalization_start) * 1000
+            logger.info("[Perf] normalization_ms=%.0f", norm_ms)
             if should_debug_regression_case(q.session_id, q.task_anchor, text):
                 log_regression_debug(raw_response, complete_response)
         except HTTPException as http_err:
@@ -452,7 +462,9 @@ def ask(q: Query, response_format: Optional[str] = None):
             logger.error("Validation error during /ask. session_id=%s error=%s", q.session_id, e)
             raise HTTPException(500, f"Validation error: {str(e)}")
         
+        total_ms = (time.time() - request_start) * 1000
         log_timing("Total request", request_start)
+        logger.info("[Perf] total_ms=%.0f", total_ms)
         
         if validation_result.is_valid:
             # Stream the valid response to user
@@ -462,7 +474,7 @@ def ask(q: Query, response_format: Optional[str] = None):
                 final_response = complete_response
                 session["last_report"] = complete_response
                 logger.info("[FallbackTrace] stage=app_streaming_build_payload fallback_used=%s", fallback_used)
-                structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used)
+                structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms)
                 if fallback_used:
                     structured["fallback_used"] = True
                     if "metadata" in structured:
@@ -475,7 +487,7 @@ def ask(q: Query, response_format: Optional[str] = None):
                 if sessions.should_update_history(validation_result):
                     sessions.add_valid_exchange(q.session_id, text, final_response)
                 
-                # Persist to database based on mode
+                # Persist to database based on mode (reuse structured payload - no duplicate rebuild)
                 try:
                     if db_service.available:
                         if session["mode"] == "ADVISORY":
@@ -487,27 +499,25 @@ def ask(q: Query, response_format: Optional[str] = None):
                                 title=f"Advisory Session {q.session_id[:8]}"
                             )
                             logger.debug(f"[History] Saving record -> mode={session['mode']}, session_id={q.session_id}")
-                        else:
-                            payload = build_mode_json_payload(final_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used)
-                            if session["mode"] == "AUDIT":
-                                issue_count = payload.get("issue_count", 0)
-                                issues = payload.get("issues", [])
-                                record_id = db_service.insert_audit(
-                                    filename="text_input",
-                                    issue_count=issue_count,
-                                    issues=issues,
-                                    raw_response=final_response,
-                                    mode=session["mode"],
-                                    severity_level="HIGH" if issue_count > 0 else "LOW"
-                                )
-                                logger.debug(f"[History] Saving record -> mode={session['mode']}, id={record_id}")
-                            elif session["mode"] == "REDACTION":
-                                db_service.insert_redaction(
-                                    filename="text_input",
-                                    redaction_count=0,
-                                    entities={},
-                                    redacted_text=final_response
-                                )
+                        elif session["mode"] == "AUDIT":
+                            issue_count = structured.get("issue_count", 0)
+                            issues = structured.get("issues", [])
+                            record_id = db_service.insert_audit(
+                                filename="text_input",
+                                issue_count=issue_count,
+                                issues=issues,
+                                raw_response=final_response,
+                                mode=session["mode"],
+                                severity_level="HIGH" if issue_count > 0 else "LOW"
+                            )
+                            logger.debug(f"[History] Saving record -> mode={session['mode']}, id={record_id}")
+                        elif session["mode"] == "REDACTION":
+                            db_service.insert_redaction(
+                                filename="text_input",
+                                redaction_count=0,
+                                entities={},
+                                redacted_text=final_response
+                            )
                 except Exception as e:
                     logger.warning(f"Failed to persist response: {str(e)}")
             except Exception as e:
@@ -692,11 +702,15 @@ def ask_file(
         ]
         log_timing("Prompt build", prompt_start)
 
+        inference_start = time.time()
         raw_response, fallback_used = response_generator.generate_response(messages, settings.MODEL_FAST, effective_mode)
+        inference_duration_ms = (time.time() - inference_start) * 1000
+        logger.info("[Perf] inference_ms=%.0f", inference_duration_ms)
         logger.info("[FallbackTrace] stage=app_file_upload_handoff fallback_used=%s", fallback_used)
         normalization_start = time.time()
         complete_response = normalize_audit_response(raw_response, effective_mode)
-        log_timing("Normalization", normalization_start)
+        norm_ms = (time.time() - normalization_start) * 1000
+        logger.info("[Perf] normalization_ms=%.0f", norm_ms)
         if should_debug_regression_case(session_id, filename, text):
             log_regression_debug(raw_response, complete_response)
 
@@ -711,8 +725,11 @@ def ask_file(
             complete_response,
             validation_context
             )
+        validation_ms = (time.time() - validation_start) * 1000
         log_timing("Validation", validation_start)
+        total_ms = (time.time() - request_start) * 1000
         log_timing("Total request", request_start)
+        logger.info("[Perf] total_ms=%.0f", total_ms)
 
         if not validation_result.is_valid:
             refusal_message = validation_result.refusal_message or validation_engine.get_refusal_message(
@@ -729,18 +746,17 @@ def ask_file(
         session["last_report"] = complete_response
 
         if json_response_mode:
-            structured = build_mode_json_payload(complete_response, MODEL_NAME, effective_mode, user_query=text, fallback_used=fallback_used)
+            structured = build_mode_json_payload(complete_response, MODEL_NAME, effective_mode, user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms)
             if fallback_used:
                 structured["fallback_used"] = True
                 if "metadata" in structured:
                     structured["metadata"]["fallback_used"] = True
             session["last_structured_response"] = structured
-            # Persist audit to database
+            # Persist audit to database (reuse structured - no duplicate rebuild)
             try:
                 if db_service.available:
-                    payload = build_mode_json_payload(complete_response, MODEL_NAME, effective_mode, user_query=text, fallback_used=fallback_used)
-                    issue_count = payload.get("issue_count", 0)
-                    issues = payload.get("issues", [])
+                    issue_count = structured.get("issue_count", 0)
+                    issues = structured.get("issues", [])
                     db_service.insert_audit(
                         filename=filename or "file_upload",
                         issue_count=issue_count,
@@ -752,7 +768,7 @@ def ask_file(
             except Exception as e:
                 logger.warning(f"Failed to persist audit: {str(e)}")
             
-            return JSONResponse(build_mode_json_payload(complete_response, MODEL_NAME, effective_mode, user_query=text, fallback_used=fallback_used))
+            return JSONResponse(structured)
 
         return StreamingResponse(
             response_generator.stream_to_user(complete_response),

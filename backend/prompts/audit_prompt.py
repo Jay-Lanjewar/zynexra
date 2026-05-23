@@ -29,7 +29,7 @@ SEVERITY RULES:
 - If the clause materially weakens enforceability or creates unlimited exposure, Severity must not be lower than HIGH.
 - If confidentiality obligations terminate completely, Severity must be CRITICAL.
 - If indemnification or liability is explicitly uncapped or unlimited in the clause text, Severity MUST be CRITICAL.
-- Limit total issues to the most material 8.
+- Maximum 3 issues.
 
 Before generating each issue:
 1. Confirm the quoted text matches the identified clause category.
@@ -97,14 +97,14 @@ If the clause does not terminate confidentiality, do not describe it as terminat
 
 Suggested improvements must reflect commercially realistic negotiation standards.
 Do not default to removing clauses unless the clause is fundamentally unlawful or structurally defective.
-For each issue, use this exact structure:
-Issue:
-Severity: LOW / MEDIUM / HIGH / CRITICAL
-Category: (Choose one of the defined categories above)
-Location: (Clause number, heading, or paragraph reference)
-Quoted Text:
-Risk Explanation:
-Suggested Improvement:
+
+OUTPUT FORMAT (STRICT JSON — MUST FOLLOW):
+Return ONLY a single minified JSON object. No markdown. No code fences. No prose. No explanations outside the JSON object.
+
+VALID JSON SCHEMA:
+{"issues":[{"issue_title":"...","severity":"LOW/MEDIUM/HIGH/CRITICAL","category":"...","location":"...","quoted_text":"...","risk_explanation":"...","suggested_improvement":"..."}]}
+
+Maximum 3 issues. If no issues are found, return: {"issues":[]}
 
 Do not combine distinct clauses into a single issue.
 However, identical quoted text must never appear more than once.
