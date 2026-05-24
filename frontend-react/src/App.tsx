@@ -102,15 +102,18 @@ function AppContent() {
         setUploadProgress
       );
       setResult(auditResult);
+      window.scrollTo({ top: 0, behavior: "instant" });
       setAppState(selectedMode);
       addToast("success", `${selectedMode} completed successfully`);
       logger.info("File processed successfully", { mode: selectedMode, filename: selectedFile.name });
+      await new Promise((r) => setTimeout(r, 280));
     } catch (caughtError) {
       const apiErr = caughtError as ApiError;
       setApiError(apiErr);
       setRetryAttempt(1);
       addToast("error", apiErr.message);
       logApiError("/ask_file", apiErr, { mode: selectedMode, filename: selectedFile?.name });
+      await new Promise((r) => setTimeout(r, 280));
     } finally {
       setIsLoading(false);
     }
@@ -274,61 +277,77 @@ function AppContent() {
     );
   }
 
-  // Audit results view
-  if (result || apiError) {
-    return (
-      <div className="min-h-screen bg-slate-950">
-        <TopNavigation currentMode={result?.mode || "AUDIT"} onModeChange={handleModeChange} />
-        <AuditResultsPage
-          result={result}
-          error={apiError}
-          onReset={handleReset}
-        />
-        {apiError && (
-          <div className="fixed bottom-4 left-4 z-40">
-            <RetryButton
-              onRetry={handleRetry}
-              isRetrying={isLoading}
-              attempt={retryAttempt}
-              maxAttempts={3}
-              label="Retry Upload"
-            />
-          </div>
-        )}
-      </div>
-    );
-  }
+  // Shared wrapper for upload, loading, and results
+  const showUpload = !result && !apiError && !isLoading;
+  const showResults = !!(result || apiError);
 
-  // Loading workflow view
-  if (isLoading) {
-    return (
-      <AuditLoadingWorkflow
-        filename={selectedFile?.name ?? ""}
-        mode={appState as AppMode}
-      />
-    );
-  }
-
-  // Upload/main view (AUDIT or REDACTION without results)
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <TopNavigation currentMode={appState as AppMode} onModeChange={handleModeChange} />
-      <UploadContractPage
-        error={error}
-        isLoading={isLoading}
-        selectedFile={selectedFile}
-        uploadProgress={uploadProgress}
-        selectedMode={selectedMode}
-        redactionOptions={redactionOptions}
-        onFileChange={(file) => {
-          setSelectedFile(file);
-          setError(null);
-          setApiError(null);
-        }}
-        onModeChange={handleModeChange}
-        onRedactionOptionsChange={setRedactionOptions}
-        onSubmit={handleSubmit}
-      />
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black relative">
+      {/* Upload content (wrapper stays in DOM during loading for fade-out) */}
+      {!result && !apiError && (
+        <div
+          className={`transition-all duration-200 ease-out ${
+            isLoading
+              ? 'opacity-0 scale-[0.97] pointer-events-none'
+              : 'animate-fade-up-long'
+          }`}
+        >
+          <TopNavigation currentMode={appState as AppMode} onModeChange={handleModeChange} />
+          <UploadContractPage
+            error={error}
+            isLoading={isLoading}
+            selectedFile={selectedFile}
+            uploadProgress={uploadProgress}
+            selectedMode={selectedMode}
+            redactionOptions={redactionOptions}
+            onFileChange={(file) => {
+              setSelectedFile(file);
+              setError(null);
+              setApiError(null);
+            }}
+            onModeChange={handleModeChange}
+            onRedactionOptionsChange={setRedactionOptions}
+            onSubmit={handleSubmit}
+          />
+        </div>
+      )}
+
+      {/* Results content (renders behind loading overlay during transition) */}
+      {showResults && (
+        <div>
+          <TopNavigation currentMode={result?.mode || (apiError ? "AUDIT" : "AUDIT")} onModeChange={handleModeChange} />
+          <AuditResultsPage
+            result={result}
+            error={apiError}
+            onReset={handleReset}
+          />
+          {apiError && (
+            <div className="fixed bottom-4 left-4 z-40">
+              <RetryButton
+                onRetry={handleRetry}
+                isRetrying={isLoading}
+                attempt={retryAttempt}
+                maxAttempts={3}
+                label="Retry Upload"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Loading overlay (on top of results during transition, fades out) */}
+      {isLoading && (
+        <div
+          className={`fixed inset-0 z-30 transition-opacity duration-300 ease-out ${
+            result || apiError ? 'opacity-0 pointer-events-none' : 'animate-fade-up-long'
+          }`}
+        >
+          <AuditLoadingWorkflow
+            filename={selectedFile?.name ?? ""}
+            mode={appState as AppMode}
+          />
+        </div>
+      )}
     </div>
   );
 }

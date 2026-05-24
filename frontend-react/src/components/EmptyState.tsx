@@ -58,7 +58,7 @@ const emptyStateStyles = {
 const emptyStateContent = {
   NO_ISSUES: {
     title: "No Issues Found",
-    description: "The contract analysis completed successfully with no significant issues detected. This doesn't guarantee the contract is risk-free, but no obvious concerns were identified.",
+    description: "Analysis complete. The document appears clean with no significant compliance concerns detected. Always consult legal counsel for final review.",
     actionLabel: "Audit Another Contract",
   },
   NO_FILE: {

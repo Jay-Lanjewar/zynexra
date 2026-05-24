@@ -95,10 +95,10 @@ export function FileUploader({
         aria-label={selectedFile ? `File selected: ${selectedFile.name}. Press to change.` : "Upload file. Click or drag and drop."}
         aria-describedby={displayError ? "file-error" : undefined}
         className={`
-          relative cursor-pointer rounded-lg border-2 border-dashed bg-white p-8 text-center transition-all
+          relative cursor-pointer rounded-lg border-2 border-dashed bg-slate-900/60 p-8 text-center transition-all
           ${isDragOver
-            ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 ring-offset-2"
-            : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"
+            ? "border-indigo-500/50 bg-indigo-500/10 ring-2 ring-indigo-500/20"
+            : "border-slate-700 hover:border-indigo-500/50 hover:bg-slate-800/30"
           }
           ${isUploading ? "cursor-wait opacity-60" : ""}
           focus-visible:focus-ring
@@ -116,38 +116,38 @@ export function FileUploader({
 
         {selectedFile ? (
           <div className="flex flex-col items-center gap-3">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
-              <FileCheck className="h-7 w-7 text-emerald-600" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10">
+              <FileCheck className="h-7 w-7 text-emerald-400" />
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-medium text-slate-800">{selectedFile.name}</span>
+              <span className="font-medium text-slate-200">{selectedFile.name}</span>
               <button
                 type="button"
                 onClick={handleClear}
                 disabled={isUploading}
-                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed"
+                className="rounded-full p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300 disabled:cursor-not-allowed"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <span className="text-sm text-slate-500">
+            <span className="text-sm text-slate-400">
               {(selectedFile.size / 1024).toFixed(1)} KB
             </span>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3">
-            <div className={`flex h-14 w-14 items-center justify-center rounded-full ${isDragOver ? "bg-indigo-100" : "bg-slate-100"}`}>
+            <div className={`flex h-14 w-14 items-center justify-center rounded-full ${isDragOver ? "bg-indigo-500/10" : "bg-slate-800/50"}`}>
               {isDragOver ? (
-                <UploadCloud className="h-7 w-7 text-indigo-600" />
+                <UploadCloud className="h-7 w-7 text-indigo-400" />
               ) : (
-                <FileUp className="h-7 w-7 text-slate-500" />
+                <FileUp className="h-7 w-7 text-slate-400" />
               )}
             </div>
             <div className="space-y-1">
-              <p className="font-medium text-slate-700">
+              <p className="font-medium text-slate-200">
                 {isDragOver ? "Drop file here" : "Drag and drop your contract"}
               </p>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-slate-400">
                 or click to browse · PDF, TXT, DOC up to 10MB
               </p>
             </div>
@@ -158,12 +158,12 @@ export function FileUploader({
       {isUploading && (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-600">Uploading and analyzing...</span>
-            <span className="font-medium text-slate-700">{uploadProgress}%</span>
+            <span className="text-slate-400">Uploading and analyzing...</span>
+            <span className="font-medium text-slate-200">{uploadProgress}%</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+          <div className="h-2 overflow-hidden rounded-full bg-slate-700">
             <div
-              className="h-full bg-indigo-600 transition-all duration-300 ease-out"
+              className="h-full bg-indigo-500 transition-all duration-300 ease-out"
               style={{ width: `${uploadProgress}%` }}
             />
           </div>
@@ -171,7 +171,7 @@ export function FileUploader({
       )}
 
       {displayError && (
-        <div id="file-error" role="alert" className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div id="file-error" role="alert" className="flex items-center gap-2 rounded-md border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400">
           <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
           {displayError}
         </div>

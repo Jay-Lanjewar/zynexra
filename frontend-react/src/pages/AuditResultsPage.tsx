@@ -184,13 +184,15 @@ function RiskLevelBadge({ level }: { level: RiskLevel }) {
   );
 }
 
-function AuditSummary({ issues, riskLevel, confidenceLabel, confidenceScore }: {
+function AuditSummary({ issues, riskLevel, confidenceLabel, confidenceScore, inferenceDurationMs }: {
   issues: AuditResponse["issues"];
   riskLevel: RiskLevel;
   confidenceLabel?: string;
   confidenceScore?: number;
+  inferenceDurationMs?: number;
 }) {
   const oneLiner = generateOneLineSummary(issues, riskLevel);
+  const duration = inferenceDurationMs ? (inferenceDurationMs / 1000).toFixed(1) : null;
 
   return (
     <section
@@ -220,14 +222,20 @@ function AuditSummary({ issues, riskLevel, confidenceLabel, confidenceScore }: {
 
         <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-3">
           <div className="flex flex-col gap-2">
-            <span className="text-xs text-slate-500">Privacy</span>
+            <span className="text-xs text-slate-500">Processing</span>
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <ShieldCheck className="h-4 w-4 text-emerald-500" aria-hidden="true" />
               <span>Processed locally</span>
-              <span className="text-slate-600">·</span>
-              <span className="text-slate-500">No cloud upload used</span>
             </div>
-            <span className="text-xs text-slate-600">Local inference only</span>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+              <span>No cloud upload used</span>
+              {duration && (
+                <>
+                  <span className="text-slate-600">·</span>
+                  <span className="font-medium text-slate-400">Analyzed in {duration}s</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -250,7 +258,7 @@ function KeyFindingsPanel({ issues }: { issues: AuditResponse["issues"] }) {
   return (
     <section
       className="animate-fade-up rounded-xl border border-slate-800 bg-slate-900/40 px-5 py-4"
-      style={{ animationDelay: "150ms" }}
+      style={{ animationDelay: "300ms" }}
       aria-label="Key findings"
     >
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
@@ -343,6 +351,7 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
             riskLevel={riskLevel ?? "SAFE"}
             confidenceLabel={confidenceLabel}
             confidenceScore={confidenceScore}
+            inferenceDurationMs={result.metadata?.inference_duration_ms}
           />
           <KeyFindingsPanel issues={result.issues} />
         </div>
@@ -440,7 +449,7 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
                     <div
                       key={`${issue.location}-${issue.category}-${idx}`}
                       className="animate-fade-up"
-                      style={{ animationDelay: `${400 + idx * 80}ms` }}
+                      style={{ animationDelay: `${600 + idx * 80}ms` }}
                     >
                       <CollapsibleIssueCard
                         issue={issue}
@@ -457,7 +466,7 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
                 <div
                   key={`${issue.location}-${issue.category}-${index}`}
                   className="animate-fade-up"
-                  style={{ animationDelay: `${400 + index * 80}ms` }}
+                  style={{ animationDelay: `${600 + index * 80}ms` }}
                 >
                   <CollapsibleIssueCard
                     issue={issue}

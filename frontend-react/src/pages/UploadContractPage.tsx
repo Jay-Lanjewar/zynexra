@@ -71,33 +71,33 @@ export function UploadContractPage({
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 py-8 sm:px-8">
-      <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 sm:flex-row sm:items-center sm:justify-between">
+      <header className="flex flex-col gap-4 border-b border-slate-800 pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-950">Contract Audit</h1>
-          <p className="mt-1 text-sm text-slate-600">Upload and analyze your contracts locally</p>
+          <h1 className="text-3xl font-semibold text-slate-100">Contract Audit</h1>
+          <p className="mt-1 text-sm text-slate-400">Upload and analyze your contracts locally</p>
         </div>
-        <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-          <ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+        <div className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-emerald-400">
+          <ShieldCheck className="h-4 w-4 text-emerald-400" aria-hidden="true" />
           <span className="hidden sm:inline">Offline legal analysis</span>
         </div>
       </header>
 
       <section className="grid flex-1 gap-8 py-8 lg:grid-cols-[1fr_0.8fr] lg:items-center">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-950">
+          <h2 className="text-2xl font-semibold text-slate-100">
             Upload a contract for local processing
           </h2>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
+          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-400">
             {selectedModeConfig.description}
           </p>
 
-          <div className="mt-8 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mt-8 rounded-lg border border-slate-800 bg-slate-900/60 p-5 backdrop-blur">
             <div className="mb-5">
-              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-300">
                 Mode
-                <Info className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                <Info className="h-4 w-4 text-slate-500" aria-hidden="true" />
               </div>
-              <div className="grid gap-2 rounded-md bg-slate-100 p-1 sm:grid-cols-3" role="tablist" aria-label="Processing mode">
+              <div className="grid gap-2 rounded-md bg-slate-800/50 p-1 sm:grid-cols-3" role="tablist" aria-label="Processing mode">
                 {modes.map((mode) => {
                   const Icon = mode.icon;
                   const isSelected = selectedMode === mode.value;
@@ -111,8 +111,8 @@ export function UploadContractPage({
                       onClick={() => onModeChange(mode.value)}
                       className={`flex min-h-20 flex-col items-start justify-center gap-2 rounded-md px-3 py-2 text-left transition ${
                         isSelected
-                          ? "bg-white text-slate-950 shadow-sm ring-1 ring-slate-200"
-                          : "text-slate-600 hover:bg-white/70 hover:text-slate-900"
+                          ? "bg-slate-800 text-slate-100 ring-1 ring-slate-700"
+                          : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
                       }`}
                     >
                       <span className="flex items-center gap-2 text-sm font-semibold">
@@ -135,13 +135,13 @@ export function UploadContractPage({
             />
 
             {selectedMode === "REDACTION" ? (
-              <div className="mt-5 border-t border-slate-200 pt-5">
-                <div className="text-sm font-semibold text-slate-800">Redaction toggles</div>
+              <div className="mt-5 border-t border-slate-800 pt-5">
+                <div className="text-sm font-semibold text-slate-300">Redaction toggles</div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {toggleOptions.map((option) => (
                     <label
                       key={option.key}
-                      className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                      className="flex items-center justify-between gap-3 rounded-md border border-slate-800 bg-slate-800/30 px-3 py-2 text-sm text-slate-400"
                     >
                       <span>{option.label}</span>
                       <input
@@ -153,7 +153,7 @@ export function UploadContractPage({
                             [option.key]: event.target.checked,
                           });
                         }}
-                        className="h-4 w-4 accent-slate-950"
+                        className="h-4 w-4 accent-indigo-500"
                       />
                     </label>
                   ))}
@@ -165,7 +165,7 @@ export function UploadContractPage({
               type="button"
               onClick={onSubmit}
               disabled={submitDisabled}
-              className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-indigo-500 px-4 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
             >
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
               {isLoading ? "Processing request" : `Run ${selectedModeConfig.label.toLowerCase()}`}
@@ -173,26 +173,26 @@ export function UploadContractPage({
           </div>
         </div>
 
-        <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-950">{selectedModeConfig.label} output</h2>
+        <aside className="rounded-lg border border-slate-800 bg-slate-900/60 p-5 backdrop-blur">
+          <h2 className="text-base font-semibold text-slate-100">{selectedModeConfig.label} output</h2>
           {selectedMode === "AUDIT" ? (
-            <div className="mt-4 grid gap-2 text-sm text-slate-600">
+            <div className="mt-4 grid gap-2 text-sm text-slate-400">
               {["severity", "category", "location", "quoted_text", "risk_explanation", "suggested_improvement"].map(
                 (field) => (
-                  <div key={field} className="rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700">
+                  <div key={field} className="rounded-md bg-slate-800/30 px-3 py-2 font-mono text-xs text-slate-400">
                     {field}
                   </div>
                 )
               )}
             </div>
           ) : (
-            <p className="mt-4 rounded-md bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-600">
+            <p className="mt-4 rounded-md bg-slate-800/30 px-3 py-3 text-sm leading-6 text-slate-400">
               {selectedMode === "REDACTION"
                 ? "The backend returns original text, entity metadata, confidence scores, and redacted text."
                 : "Advisory uses the existing question endpoint and returns advisory_text plus legacy_text."}
             </p>
           )}
-          <div className="mt-6 flex items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          <div className="mt-6 flex items-center gap-2 rounded-md bg-slate-800/30 px-3 py-2 text-xs text-slate-500">
             <Server className="h-3.5 w-3.5" />
             <span>API: {getApiBaseUrl()}</span>
           </div>
