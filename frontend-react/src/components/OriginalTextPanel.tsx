@@ -2,15 +2,15 @@ import { ReactNode } from "react";
 import type { RedactionEntity } from "../types";
 
 const entityStyles: Record<string, string> = {
-  PERSON: "bg-sky-100 text-sky-800 ring-sky-200",
-  EMAIL: "bg-rose-100 text-rose-800 ring-rose-200",
-  PHONE: "bg-amber-100 text-amber-800 ring-amber-200",
-  ADDRESS: "bg-emerald-100 text-emerald-800 ring-emerald-200",
-  COMPANY: "bg-violet-100 text-violet-800 ring-violet-200",
-  LOCATION: "bg-teal-100 text-teal-800 ring-teal-200",
-  MONEY: "bg-lime-100 text-lime-800 ring-lime-200",
-  DATE: "bg-cyan-100 text-cyan-800 ring-cyan-200",
-  ID_NUMBER: "bg-fuchsia-100 text-fuchsia-800 ring-fuchsia-200",
+  PERSON: "bg-sky-500/10 text-sky-300 ring-sky-500/30",
+  EMAIL: "bg-rose-500/10 text-rose-300 ring-rose-500/30",
+  PHONE: "bg-amber-500/10 text-amber-300 ring-amber-500/30",
+  ADDRESS: "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30",
+  COMPANY: "bg-violet-500/10 text-violet-300 ring-violet-500/30",
+  LOCATION: "bg-teal-500/10 text-teal-300 ring-teal-500/30",
+  MONEY: "bg-lime-500/10 text-lime-300 ring-lime-500/30",
+  DATE: "bg-cyan-500/10 text-cyan-300 ring-cyan-500/30",
+  ID_NUMBER: "bg-fuchsia-500/10 text-fuchsia-300 ring-fuchsia-500/30",
 };
 
 interface OriginalTextPanelProps {
@@ -48,7 +48,7 @@ export function OriginalTextPanel({
       <mark
         key={`${entity.entity_type}-${entity.start}-${entity.end}-${idx}`}
         className={`rounded px-1 py-0.5 ring-1 cursor-pointer transition-all ${
-          entityStyles[entity.entity_type] ?? "bg-slate-100 text-slate-800 ring-slate-200"
+          entityStyles[entity.entity_type] ?? "bg-slate-700/50 text-slate-400 ring-slate-700"
         } ${hoveredIndex === idx ? "ring-2 shadow-md" : ""}`}
         title={`${entity.entity_type} - ${(entity.confidence * 100).toFixed(0)}%`}
         onMouseEnter={() => onHoverEntity?.(idx)}
@@ -65,9 +65,9 @@ export function OriginalTextPanel({
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm h-full flex flex-col">
-      <h2 className="text-sm font-semibold text-slate-900">Original Text</h2>
-      <pre className="mt-3 flex-1 max-h-[35rem] overflow-auto whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800">
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 shadow-lg shadow-black/20 h-full flex flex-col">
+      <h2 className="text-sm font-semibold text-slate-200">Original Text</h2>
+      <pre className="mt-3 flex-1 max-h-[35rem] overflow-auto whitespace-pre-wrap rounded-lg border border-slate-800 bg-slate-950 p-4 text-sm leading-6 text-slate-300">
         <>{parts}</>
       </pre>
     </div>

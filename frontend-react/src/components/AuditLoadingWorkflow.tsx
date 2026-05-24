@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -10,6 +10,7 @@ import {
   Loader2,
   Search,
   ShieldCheck,
+  Clock,
 } from "lucide-react";
 import type { AppMode } from "../types";
 
@@ -37,18 +38,28 @@ const redactionStages: Stage[] = [
 ];
 
 const statusMessages = [
-  "Reviewing indemnification language...",
-  "Checking confidentiality obligations...",
+  "Scanning indemnification clauses...",
+  "Evaluating termination language...",
+  "Cross-checking liability exposure...",
+  "Analyzing confidentiality obligations...",
   "Detecting structural inconsistencies...",
-  "Validating document quality...",
-  "Cross-referencing jurisdiction clauses...",
-  "Analyzing liability limitations...",
+  "Reviewing dispute resolution terms...",
+  "Inspecting warranty provisions...",
+  "Validating jurisdiction clauses...",
+  "Assessing limitation of liability...",
+  "Checking force majeure language...",
   "Verifying compliance requirements...",
-  "Scanning for ambiguous language...",
-  "Evaluating risk exposure across sections...",
-  "Reviewing termination conditions...",
-  "Checking warranty disclaimers...",
-  "Analyzing dispute resolution clauses...",
+  "Reviewing assignment clauses...",
+  "Analyzing non-compete terms...",
+  "Inspecting data protection language...",
+  "Cross-referencing governing law...",
+];
+
+const timeoutMessages = [
+  "Complex document detected. Continuing deep analysis locally...",
+  "Extended analysis in progress. Your data remains private.",
+  "Processing dense legal language. Results will appear shortly.",
+  "Detailed review underway. No cloud upload used.",
 ];
 
 const stageIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -70,12 +81,17 @@ type AuditLoadingWorkflowProps = {
 export function AuditLoadingWorkflow({ filename, mode }: AuditLoadingWorkflowProps) {
   const [activeStageIndex, setActiveStageIndex] = useState(0);
   const [statusIndex, setStatusIndex] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [isTakingLong, setIsTakingLong] = useState(false);
+  const [timeoutMsgIndex, setTimeoutMsgIndex] = useState(0);
+  const startTime = useRef(Date.now());
 
   const stages = mode === "AUDIT" ? auditStages : redactionStages;
 
+  // Adaptive progress simulation
   useEffect(() => {
-    const durations = [1800, 2200, 2500, 2500, 2000];
-    const jitter = () => Math.random() * 300 - 150;
+    const durations = [1500, 1800, 2200, 2200, 1800];
+    const jitter = () => Math.random() * 200 - 100;
 
     let cumulativeDelay = durations[0] + jitter();
     const timeouts: ReturnType<typeof setTimeout>[] = [];
@@ -97,14 +113,44 @@ export function AuditLoadingWorkflow({ filename, mode }: AuditLoadingWorkflowPro
     };
   }, []);
 
+  // Faster micro-updates (1.8s vs 2.8s)
   useEffect(() => {
     const interval = setInterval(() => {
       setStatusIndex((prev) => (prev + 1) % statusMessages.length);
-    }, 2800);
+    }, 1800);
     return () => clearInterval(interval);
   }, []);
 
-  const progressPercent = (activeStageIndex / (stages.length - 1)) * 100;
+  // Elapsed timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime.current) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Timeout reassurance after 8s
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsTakingLong(true);
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Rotate timeout messages
+  useEffect(() => {
+    if (!isTakingLong) return;
+    const interval = setInterval(() => {
+      setTimeoutMsgIndex((prev) => (prev + 1) % timeoutMessages.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isTakingLong]);
+
+  // Adaptive progress: fast initial (0-60%) then slower
+  const baseProgress = (activeStageIndex / (stages.length - 1)) * 100;
+  const adaptiveProgress = isTakingLong
+    ? Math.min(baseProgress, 92)
+    : Math.min(baseProgress + 5, 95);
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-slate-900 via-slate-950 to-black">
@@ -113,7 +159,7 @@ export function AuditLoadingWorkflow({ filename, mode }: AuditLoadingWorkflowPro
         <div
           className="h-full transition-all duration-700 ease-out"
           style={{
-            width: `${Math.min(progressPercent, 100)}%`,
+            width: `${Math.min(adaptiveProgress, 100)}%`,
             background: "linear-gradient(90deg, #6366f1, #10b981)",
           }}
         />
@@ -131,9 +177,11 @@ export function AuditLoadingWorkflow({ filename, mode }: AuditLoadingWorkflowPro
             </h1>
             <p className="truncate text-xs text-slate-500">{filename}</p>
           </div>
-          <span className="shrink-0 rounded-full bg-indigo-500/10 px-3 py-1 text-[11px] font-medium text-indigo-400">
-            Processing
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 rounded-full bg-indigo-500/10 px-3 py-1 text-[11px] font-medium text-indigo-400">
+              {isTakingLong ? "Still working..." : "Processing"}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -180,13 +228,24 @@ export function AuditLoadingWorkflow({ filename, mode }: AuditLoadingWorkflowPro
                       {stage.label}
                     </p>
                     {isActive && (
-                      <p
-                        key={statusIndex}
-                        className="mt-1 animate-fade-in text-xs text-slate-500"
-                        aria-live="polite"
-                      >
-                        {statusMessages[statusIndex]}
-                      </p>
+                      <div>
+                        <p
+                          key={statusIndex}
+                          className="mt-1 animate-fade-in text-xs text-slate-500"
+                          aria-live="polite"
+                        >
+                          {statusMessages[statusIndex]}
+                        </p>
+                        {isTakingLong && (
+                          <p
+                            key={`timeout-${timeoutMsgIndex}`}
+                            className="mt-1 animate-fade-in text-xs text-amber-400/70"
+                            aria-live="polite"
+                          >
+                            {timeoutMessages[timeoutMsgIndex]}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -214,13 +273,17 @@ export function AuditLoadingWorkflow({ filename, mode }: AuditLoadingWorkflowPro
       {/* Footer */}
       <footer className="border-t border-slate-800/50 px-6 py-4">
         <div className="mx-auto flex max-w-lg items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-slate-600">
+          <div className="flex items-center gap-2 text-xs text-slate-500">
             <div className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-emerald-500/70" />
-            Local inference
+            Runs locally
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-600">
+          <div className="flex items-center gap-2 text-xs text-slate-500">
             <ShieldCheck className="h-3.5 w-3.5" />
-            Secure processing
+            No cloud upload
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <Clock className="h-3.5 w-3.5" />
+            {elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`}
           </div>
         </div>
       </footer>

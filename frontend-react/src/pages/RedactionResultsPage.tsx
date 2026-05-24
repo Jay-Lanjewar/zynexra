@@ -14,15 +14,15 @@ type RedactionResultsPageProps = {
 };
 
 const entityStyles: Record<string, string> = {
-  PERSON: "bg-sky-100 text-sky-800 ring-sky-200",
-  EMAIL: "bg-rose-100 text-rose-800 ring-rose-200",
-  PHONE: "bg-amber-100 text-amber-800 ring-amber-200",
-  ADDRESS: "bg-emerald-100 text-emerald-800 ring-emerald-200",
-  COMPANY: "bg-violet-100 text-violet-800 ring-violet-200",
-  LOCATION: "bg-teal-100 text-teal-800 ring-teal-200",
-  MONEY: "bg-lime-100 text-lime-800 ring-lime-200",
-  DATE: "bg-cyan-100 text-cyan-800 ring-cyan-200",
-  ID_NUMBER: "bg-fuchsia-100 text-fuchsia-800 ring-fuchsia-200",
+  PERSON: "bg-sky-500/10 text-sky-300 ring-sky-500/30",
+  EMAIL: "bg-rose-500/10 text-rose-300 ring-rose-500/30",
+  PHONE: "bg-amber-500/10 text-amber-300 ring-amber-500/30",
+  ADDRESS: "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30",
+  COMPANY: "bg-violet-500/10 text-violet-300 ring-violet-500/30",
+  LOCATION: "bg-teal-500/10 text-teal-300 ring-teal-500/30",
+  MONEY: "bg-lime-500/10 text-lime-300 ring-lime-500/30",
+  DATE: "bg-cyan-500/10 text-cyan-300 ring-cyan-500/30",
+  ID_NUMBER: "bg-fuchsia-500/10 text-fuchsia-300 ring-fuchsia-500/30",
 };
 
 function downloadBlob(content: string, fileName: string, type: string) {
@@ -52,10 +52,10 @@ export function RedactionResultsPage({ result, onReset }: RedactionResultsPagePr
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-7xl px-5 py-8 sm:px-8">
-      <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 sm:flex-row sm:items-center sm:justify-between">
+      <header className="flex flex-col gap-4 border-b border-slate-800 pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Redaction Results</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950">
+          <h1 className="mt-2 text-3xl font-semibold text-slate-100">
             {entities.length} sensitive entit{entities.length === 1 ? "y" : "ies"} detected
           </h1>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -64,7 +64,7 @@ export function RedactionResultsPage({ result, onReset }: RedactionResultsPagePr
               return (
                 <span
                   key={entityType}
-                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${entityStyles[entityType] ?? "bg-slate-100 text-slate-700 ring-slate-200"}`}
+                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${entityStyles[entityType] ?? "bg-slate-700/50 text-slate-400 ring-slate-700"}`}
                 >
                   {entityType}: {count}
                 </span>
@@ -76,7 +76,7 @@ export function RedactionResultsPage({ result, onReset }: RedactionResultsPagePr
           <button
             type="button"
             onClick={() => downloadBlob(redactedText, "redacted-text.txt", "text/plain")}
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 text-sm font-semibold text-slate-300 hover:bg-slate-700"
           >
             <FileText className="h-4 w-4" />
             Text
@@ -84,7 +84,7 @@ export function RedactionResultsPage({ result, onReset }: RedactionResultsPagePr
           <button
             type="button"
             onClick={() => downloadBlob(JSON.stringify(result, null, 2), "redaction-metadata.json", "application/json")}
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 text-sm font-semibold text-slate-300 hover:bg-slate-700"
           >
             <FileJson className="h-4 w-4" />
             JSON
@@ -92,7 +92,7 @@ export function RedactionResultsPage({ result, onReset }: RedactionResultsPagePr
           <button
             type="button"
             onClick={() => downloadBlob(redactedText, "redacted-output.txt", "text/plain")}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"
             title="Download redacted text"
           >
             <Download className="h-4 w-4" />
@@ -100,7 +100,7 @@ export function RedactionResultsPage({ result, onReset }: RedactionResultsPagePr
           <button
             type="button"
             onClick={onReset}
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-4 text-sm font-semibold text-slate-300 hover:bg-slate-700"
           >
             <ArrowLeft className="h-4 w-4" />
             New request
@@ -137,14 +137,14 @@ export function RedactionResultsPage({ result, onReset }: RedactionResultsPagePr
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 shadow-lg shadow-black/20">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-slate-900">Entity Metadata</h2>
-          <div className="flex gap-3 text-xs font-semibold text-slate-600">
-            <div className="bg-emerald-50 text-emerald-700 px-2 py-1 rounded">
+          <h2 className="text-sm font-semibold text-slate-200">Entity Metadata</h2>
+          <div className="flex gap-3 text-xs font-semibold text-slate-500">
+            <div className="bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded">
               Active: {getActiveCount()}
             </div>
-            <div className="bg-blue-50 text-blue-700 px-2 py-1 rounded">
+            <div className="bg-indigo-500/10 text-indigo-400 px-2 py-1 rounded">
               Total: {entities.length}
             </div>
           </div>
@@ -152,7 +152,7 @@ export function RedactionResultsPage({ result, onReset }: RedactionResultsPagePr
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[800px] border-collapse text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-slate-800 text-xs uppercase tracking-wide text-slate-500">
                 <th className="py-2 pr-3 w-8"></th>
                 <th className="py-2 pr-3">Type</th>
                 <th className="py-2 pr-3">Original</th>
@@ -165,9 +165,9 @@ export function RedactionResultsPage({ result, onReset }: RedactionResultsPagePr
               {entities.map((entity, idx) => (
                 <tr
                   key={`${entity.entity_type}-${entity.start}-${entity.end}-${idx}`}
-                  className={`border-b border-slate-100 cursor-pointer transition-colors ${
-                    isEntityActive(idx) ? "hover:bg-slate-50" : "opacity-50"
-                  } ${hoveredEntityIndex === idx ? "bg-blue-50" : ""}`}
+                  className={`border-b border-slate-800 cursor-pointer transition-colors ${
+                    isEntityActive(idx) ? "hover:bg-slate-800/40" : "opacity-50"
+                  } ${hoveredEntityIndex === idx ? "bg-indigo-500/5" : ""}`}
                   onMouseEnter={() => setHoveredEntityIndex(idx)}
                   onMouseLeave={() => setHoveredEntityIndex(null)}
                   onClick={() => toggleEntity(idx)}
@@ -177,27 +177,27 @@ export function RedactionResultsPage({ result, onReset }: RedactionResultsPagePr
                       type="checkbox"
                       checked={isEntityActive(idx)}
                       onChange={() => toggleEntity(idx)}
-                      className="rounded cursor-pointer"
+                      className="rounded cursor-pointer accent-indigo-500"
                       aria-label={`Toggle ${entity.entity_type}`}
                     />
                   </td>
                   <td className="py-2 pr-3">
                     <span
                       className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${
-                        entityStyles[entity.entity_type] ?? "bg-slate-100 text-slate-700"
+                        entityStyles[entity.entity_type] ?? "bg-slate-700/50 text-slate-400"
                       }`}
                     >
                       {entity.entity_type}
                     </span>
                   </td>
-                  <td className="max-w-xs py-2 pr-3 font-mono text-xs text-slate-700 truncate">
+                  <td className="max-w-xs py-2 pr-3 font-mono text-xs text-slate-300 truncate">
                     {entity.original_text}
                   </td>
-                  <td className="py-2 pr-3 font-mono text-xs text-slate-700">{entity.replacement}</td>
+                  <td className="py-2 pr-3 font-mono text-xs text-slate-400">{entity.replacement}</td>
                   <td className="py-2 pr-3">
                     <ConfidenceBadge confidence={entity.confidence} />
                   </td>
-                  <td className="py-2 pr-3 text-slate-700">
+                  <td className="py-2 pr-3 text-slate-400">
                     {entity.start}-{entity.end}
                   </td>
                 </tr>
@@ -207,9 +207,9 @@ export function RedactionResultsPage({ result, onReset }: RedactionResultsPagePr
         </div>
       </section>
 
-      <footer className="mt-8 border-t border-slate-200 py-4 text-center text-sm text-slate-500">
+      <footer className="mt-8 border-t border-slate-800 py-4 text-center text-sm text-slate-500">
         <div className="flex items-center justify-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-emerald-600" />
+          <ShieldCheck className="h-4 w-4 text-emerald-500" />
           <span>Powered by {result.model}</span>
         </div>
       </footer>

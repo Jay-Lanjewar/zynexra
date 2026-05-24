@@ -214,15 +214,15 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black">
       {/* Mobile Menu Button */}
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm hover:bg-slate-50"
+          className="p-2 bg-slate-900/80 rounded-lg border border-slate-800 shadow-sm hover:bg-slate-800"
         >
           <svg
-            className="w-5 h-5"
+            className="w-5 h-5 text-slate-400"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -242,13 +242,13 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
         <div
           className={`${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } lg:translate-x-0 fixed lg:static w-64 h-full bg-white border-r border-slate-200 p-6 transition-transform duration-300 z-40 overflow-y-auto`}
+          } lg:translate-x-0 fixed lg:static w-64 h-full bg-slate-950/80 border-r border-slate-800 p-6 transition-transform duration-300 z-40 overflow-y-auto backdrop-blur`}
         >
           <div className="space-y-6">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onModeChange("AUDIT")}
-                className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+                className="flex items-center gap-1.5 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Zynexra
@@ -256,41 +256,41 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
             </div>
 
             <div>
-              <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <FolderOpen className="h-5 w-5 text-blue-600" />
+              <h1 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                <FolderOpen className="h-5 w-5 text-indigo-400" />
                 Workspace
               </h1>
-              <p className="text-sm text-slate-600 mt-1">Manage your audit history</p>
+              <p className="text-sm text-slate-500 mt-1">Manage your audit history</p>
             </div>
 
-            <div className="pt-4 border-t border-slate-200">
+            <div className="pt-4 border-t border-slate-800">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Navigate</p>
               <nav className="space-y-1">
                 <button
                   onClick={() => onModeChange("AUDIT")}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800/40 hover:text-slate-200 transition-colors"
                 >
-                  <FileSearch className="h-4 w-4 text-blue-500" />
+                  <FileSearch className="h-4 w-4 text-indigo-400" />
                   New Audit
                 </button>
                 <button
                   onClick={() => onModeChange("REDACTION")}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800/40 hover:text-slate-200 transition-colors"
                 >
-                  <Eraser className="h-4 w-4 text-amber-500" />
+                  <Eraser className="h-4 w-4 text-amber-400" />
                   New Redaction
                 </button>
                 <button
                   onClick={() => onModeChange("ADVISORY")}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800/40 hover:text-slate-200 transition-colors"
                 >
-                  <MessageSquareText className="h-4 w-4 text-emerald-500" />
+                  <MessageSquareText className="h-4 w-4 text-emerald-400" />
                   Advisory Chat
                 </button>
               </nav>
             </div>
 
-            <div className="pt-4 border-t border-slate-200">
+            <div className="pt-4 border-t border-slate-800">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Filter by type</p>
             </div>
 
@@ -302,11 +302,11 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
                 }}
                 className={`w-full text-left px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
                   activeTab === "all"
-                    ? "bg-blue-100 text-blue-900"
-                    : "text-slate-700 hover:bg-slate-100"
+                    ? "bg-slate-800 text-slate-100"
+                    : "text-slate-400 hover:bg-slate-800/40"
                 }`}
               >
-                📋 All Items
+                All Items
               </button>
               <button
                 onClick={() => {
@@ -315,11 +315,11 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
                 }}
                 className={`w-full text-left px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
                   activeTab === "audit"
-                    ? "bg-blue-100 text-blue-900"
-                    : "text-slate-700 hover:bg-slate-100"
+                    ? "bg-slate-800 text-slate-100"
+                    : "text-slate-400 hover:bg-slate-800/40"
                 }`}
               >
-                ✓ Recent Audits
+                Recent Audits
               </button>
               <button
                 onClick={() => {
@@ -328,11 +328,11 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
                 }}
                 className={`w-full text-left px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
                   activeTab === "redaction"
-                    ? "bg-blue-100 text-blue-900"
-                    : "text-slate-700 hover:bg-slate-100"
+                    ? "bg-slate-800 text-slate-100"
+                    : "text-slate-400 hover:bg-slate-800/40"
                 }`}
               >
-                🔒 Recent Redactions
+                Recent Redactions
               </button>
               <button
                 onClick={() => {
@@ -341,15 +341,15 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
                 }}
                 className={`w-full text-left px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
                   activeTab === "advisory"
-                    ? "bg-blue-100 text-blue-900"
-                    : "text-slate-700 hover:bg-slate-100"
+                    ? "bg-slate-800 text-slate-100"
+                    : "text-slate-400 hover:bg-slate-800/40"
                 }`}
               >
-                💬 Advisory Chats
+                Advisory Chats
               </button>
             </nav>
 
-            <div className="pt-6 border-t border-slate-200">
+            <div className="pt-6 border-t border-slate-800">
               <ActivitySummary summary={summary} isLoading={summaryLoading} />
             </div>
           </div>
@@ -360,7 +360,7 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
           <div className="max-w-6xl mx-auto p-4 lg:p-8">
             {/* Header */}
             <div className="mb-8">
-              <h2 className="text-2xl lg:text-3xl font-bold text-slate-900">
+              <h2 className="text-2xl lg:text-3xl font-bold text-slate-100">
                 {activeTab === "all"
                   ? "All Items"
                   : activeTab === "audit"
@@ -369,7 +369,7 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
                       ? "Recent Redactions"
                       : "Advisory Chats"}
               </h2>
-              <p className="text-slate-600 text-sm mt-1">
+              <p className="text-slate-500 text-sm mt-1">
                 {total === 0
                   ? "No items to display"
                   : `Showing ${Math.min((filter.offset || 0) + ITEMS_PER_PAGE, total)} of ${total}`}
@@ -387,8 +387,8 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
 
             {/* Error State */}
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-800">
+              <div className="mb-6 p-4 bg-red-500/5 border border-red-500/20 rounded-lg">
+                <p className="text-sm text-red-400">
                   <strong>Error:</strong> {error.message}
                 </p>
               </div>
@@ -403,10 +403,10 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
 
             {/* Empty State */}
             {!isLoading && records.length === 0 && (
-              <div className="bg-white rounded-lg border border-slate-200 p-8 text-center">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-slate-100 mb-4">
+              <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-8 text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-slate-800 mb-4">
                   <svg
-                    className="w-6 h-6 text-slate-600"
+                    className="w-6 h-6 text-slate-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -419,10 +419,10 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
                     />
                   </svg>
                 </div>
-                <h3 className="font-semibold text-slate-900 mb-1">
+                <h3 className="font-semibold text-slate-200 mb-1">
                   {hasActiveFilters ? "No results found" : "No items yet"}
                 </h3>
-                <p className="text-sm text-slate-600 mb-4">
+                <p className="text-sm text-slate-400 mb-4">
                   {hasActiveFilters
                     ? "Try adjusting your filters to find what you're looking for."
                     : `Start by creating a new ${activeTab === "advisory" ? "advisory chat" : activeTab} to see it here.`}
@@ -430,7 +430,7 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
                 {hasActiveFilters && (
                   <button
                     onClick={handleClearFilters}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                    className="text-sm font-medium text-indigo-400 hover:text-indigo-300"
                   >
                     Clear Filters
                   </button>
@@ -456,7 +456,7 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
                 {/* Pagination */}
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between">
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-slate-500">
                       Page {currentPage} of {totalPages}
                     </p>
                     <div className="flex gap-2">
@@ -468,7 +468,7 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
                           })
                         }
                         disabled={(filter.offset || 0) === 0}
-                        className="px-3 py-2 text-sm font-medium bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="px-3 py-2 text-sm font-medium bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         ← Previous
                       </button>
@@ -480,7 +480,7 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
                           })
                         }
                         disabled={currentPage >= totalPages}
-                        className="px-3 py-2 text-sm font-medium bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="px-3 py-2 text-sm font-medium bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         Next →
                       </button>
@@ -496,7 +496,7 @@ export function WorkspacePage({ onModeChange, onRecordOpen }: WorkspacePageProps
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black/50 z-30"
+          className="lg:hidden fixed inset-0 bg-black/60 z-30"
           onClick={() => setSidebarOpen(false)}
         />
       )}

@@ -66,17 +66,17 @@ const toastIcons = {
 };
 
 const toastStyles = {
-  success: "bg-emerald-50 border-emerald-200 text-emerald-800",
-  error: "bg-red-50 border-red-200 text-red-800",
-  warning: "bg-amber-50 border-amber-200 text-amber-800",
-  loading: "bg-blue-50 border-blue-200 text-blue-800",
+  success: "bg-slate-800 border-emerald-500/30 text-emerald-300 shadow-lg shadow-black/30",
+  error: "bg-slate-800 border-red-500/30 text-red-300 shadow-lg shadow-black/30",
+  warning: "bg-slate-800 border-amber-500/30 text-amber-300 shadow-lg shadow-black/30",
+  loading: "bg-slate-800 border-indigo-500/30 text-indigo-300 shadow-lg shadow-black/30",
 };
 
 const iconStyles = {
-  success: "text-emerald-500",
-  error: "text-red-500",
-  warning: "text-amber-500",
-  loading: "text-blue-500",
+  success: "text-emerald-400",
+  error: "text-red-400",
+  warning: "text-amber-400",
+  loading: "text-indigo-400",
 };
 
 export function ToastContainer() {
@@ -97,14 +97,14 @@ export function ToastContainer() {
             key={toast.id}
             role="alert"
             aria-live={toast.type === "error" ? "assertive" : "polite"}
-            className={`flex items-start gap-3 rounded-lg border px-4 py-3 shadow-lg animate-slide-in ${toastStyles[toast.type]}`}
+            className={`flex items-start gap-3 rounded-lg border px-4 py-3 shadow-lg animate-slide-in backdrop-blur ${toastStyles[toast.type]}`}
           >
             <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${iconStyles[toast.type]} ${toast.type === "loading" ? "animate-spin" : ""}`} />
             <p className="flex-1 text-sm font-medium">{toast.message}</p>
             <button
               type="button"
               onClick={() => removeToast(toast.id)}
-              className="shrink-0 p-1 rounded hover:bg-black/5 transition-colors"
+              className="shrink-0 p-1 rounded hover:bg-white/5 transition-colors"
               aria-label="Dismiss notification"
             >
               <X className="h-4 w-4" />

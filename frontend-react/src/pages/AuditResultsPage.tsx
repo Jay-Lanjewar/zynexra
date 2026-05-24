@@ -147,6 +147,32 @@ function SeveritySummary({ issues }: { issues: AuditResponse["issues"] }) {
   );
 }
 
+function SeveritySummaryBar({ issues }: { issues: AuditResponse["issues"] }) {
+  const counts = getSeverityCounts(issues);
+  const hasIssues = Object.values(counts).some((v) => v > 0);
+  if (!hasIssues || issues.length === 0) return null;
+
+  const items: { key: string; count: number; color: string }[] = [];
+  if (counts.CRITICAL > 0) items.push({ key: "Critical", count: counts.CRITICAL, color: "bg-red-500" });
+  if (counts.HIGH > 0) items.push({ key: "High", count: counts.HIGH, color: "bg-orange-500" });
+  if (counts.MEDIUM > 0) items.push({ key: "Medium", count: counts.MEDIUM, color: "bg-amber-500" });
+  if (counts.LOW > 0) items.push({ key: "Low", count: counts.LOW, color: "bg-emerald-500" });
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-2.5 text-xs">
+      <span className="font-semibold text-slate-500">Issues:</span>
+      {items.map((item) => (
+        <span key={item.key} className="flex items-center gap-1.5 font-medium text-slate-300">
+          <span className={`h-2 w-2 rounded-full ${item.color}`} />
+          {item.count} {item.key}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function ConfidenceSection({ label, score }: { label: string; score: number }) {
   const percentage = Math.round(score * 100);
   const labelColor =
@@ -389,7 +415,7 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
             <div>
               <h3 className="text-sm font-semibold text-red-300">Low Confidence Response</h3>
               <p className="mt-1 text-sm text-red-400/80">
-                This response may be incomplete or unreliable. Review the results carefully and consider re-running the analysis.
+                Some sections may require manual legal review due to limited structural clarity. Consider re-running the analysis.
               </p>
             </div>
           </div>
@@ -403,7 +429,7 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
             <div>
               <h3 className="text-sm font-semibold text-amber-300">Medium Confidence</h3>
               <p className="mt-1 text-sm text-amber-400/80">
-                Some aspects of this response may be incomplete. Review results for accuracy.
+                Some clauses may need further review. The analysis is partially structured — cross-check important sections.
               </p>
             </div>
           </div>
@@ -434,7 +460,9 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
           </pre>
         </section>
       ) : (
-        <div className="mt-6 space-y-6">
+        <div className="mt-6">
+          <SeveritySummaryBar issues={result.issues} />
+          <div className="mt-4 space-y-6">
           {groups.length > 1 ? (
             groups.map((group) => (
               <section key={group.category}>
@@ -476,6 +504,7 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
               ))}
             </section>
           )}
+          </div>
         </div>
       )}
 

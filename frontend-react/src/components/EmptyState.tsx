@@ -1,12 +1,13 @@
-import { CheckCircle2, ShieldCheck, FileUp, Search, MessageSquare, Eraser, FolderOpen } from "lucide-react";
+import { CheckCircle2, ShieldCheck, FileUp, Search, MessageSquare, Eraser, FolderOpen, AlertTriangle } from "lucide-react";
 import type { AppMode } from "../types";
 
 type EmptyStateProps = {
-  type: "NO_ISSUES" | "NO_FILE" | "NO_RECORDS" | "NO_SEARCH_RESULTS" | "NO_CHATS";
+  type: "NO_ISSUES" | "NO_FILE" | "NO_RECORDS" | "NO_SEARCH_RESULTS" | "NO_CHATS" | "LOW_CONFIDENCE";
   onReset?: () => void;
   mode?: AppMode;
   onAction?: () => void;
   actionLabel?: string;
+  onRetry?: () => void;
 };
 
 const emptyStateIcons = {
@@ -15,6 +16,7 @@ const emptyStateIcons = {
   NO_RECORDS: FolderOpen,
   NO_SEARCH_RESULTS: Search,
   NO_CHATS: MessageSquare,
+  LOW_CONFIDENCE: AlertTriangle,
 };
 
 const emptyStateStyles = {
@@ -33,7 +35,7 @@ const emptyStateStyles = {
     button: "bg-indigo-500 hover:bg-indigo-400 text-white",
   },
   NO_RECORDS: {
-    icon: "bg-blue-500/10 text-blue-400",
+    icon: "bg-indigo-500/10 text-indigo-400",
     title: "text-slate-200",
     desc: "text-slate-400",
     bg: "border-slate-700/50 bg-slate-900/50",
@@ -53,12 +55,19 @@ const emptyStateStyles = {
     bg: "border-slate-700/50 bg-slate-900/50",
     button: "bg-indigo-500 hover:bg-indigo-400 text-white",
   },
+  LOW_CONFIDENCE: {
+    icon: "bg-red-500/10 text-red-400",
+    title: "text-red-300",
+    desc: "text-red-400/80",
+    bg: "border-red-500/20 bg-red-500/5",
+    button: "bg-indigo-500 hover:bg-indigo-400 text-white",
+  },
 };
 
 const emptyStateContent = {
   NO_ISSUES: {
     title: "No Issues Found",
-    description: "Analysis complete. The document appears clean with no significant compliance concerns detected. Always consult legal counsel for final review.",
+    description: "Analysis complete. No major contractual risks were identified in the reviewed clauses. Always consult legal counsel for final approval.",
     actionLabel: "Audit Another Contract",
   },
   NO_FILE: {
@@ -81,31 +90,36 @@ const emptyStateContent = {
     description: "Start a new advisory chat to ask legal-practice questions.",
     actionLabel: "Start Chat",
   },
+  LOW_CONFIDENCE: {
+    title: "Low Confidence Response",
+    description: "Some sections may require manual legal review due to limited structural clarity. Consider re-running the analysis or consulting legal counsel.",
+    actionLabel: "Try Again",
+  },
 };
 
-export function EmptyState({ type, onReset, onAction, actionLabel }: EmptyStateProps) {
+export function EmptyState({ type, onReset, onAction, actionLabel, onRetry }: EmptyStateProps) {
   const Icon = emptyStateIcons[type];
   const styles = emptyStateStyles[type];
   const content = emptyStateContent[type];
-  const defaultAction = type === "NO_ISSUES" ? onReset : type === "NO_SEARCH_RESULTS" ? onReset : undefined;
+  const defaultAction = type === "NO_ISSUES" ? onReset : type === "NO_SEARCH_RESULTS" ? onReset : type === "LOW_CONFIDENCE" ? onRetry || onReset : undefined;
   const label = actionLabel ?? content.actionLabel;
 
   return (
     <div
       role="status"
       aria-live="polite"
-      className={`flex flex-col items-center justify-center rounded-lg border p-8 text-center ${styles.bg}`}
+      className={`flex flex-col items-center justify-center rounded-xl border p-8 text-center shadow-lg shadow-black/10 ${styles.bg}`}
     >
       <div className={`flex h-16 w-16 items-center justify-center rounded-full ${styles.icon}`}>
         <Icon className="h-8 w-8" aria-hidden="true" />
       </div>
       <h3 className={`mt-4 text-lg font-semibold ${styles.title}`}>{content.title}</h3>
-      <p className={`mt-2 max-w-md text-sm ${styles.desc}`}>{content.description}</p>
+      <p className={`mt-2 max-w-md text-sm leading-relaxed ${styles.desc}`}>{content.description}</p>
       {(label && (onAction || defaultAction)) && (
         <button
           type="button"
           onClick={onAction || defaultAction}
-          className={`mt-6 rounded-md px-4 py-2 text-sm font-semibold text-white transition-colors ${styles.button}`}
+          className={`mt-6 rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors ${styles.button}`}
         >
           {label}
         </button>

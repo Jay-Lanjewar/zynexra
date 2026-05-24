@@ -22,6 +22,7 @@ from backend.engines.legal_domain_engine import (
     DocumentDomain,
     DOMAIN_SUPPRESSION_MESSAGE,
 )
+from backend.engines.recommendation_refiner import refine_suggested_improvements
 
 
 @dataclass
@@ -937,6 +938,7 @@ def normalize_audit_issue_fields(issues: List[AuditIssue]) -> List[AuditIssue]:
                 "Introduce a liability cap so indemnification obligations include a liability cap at a defined monetary amount."
             )
 
+    issues = refine_suggested_improvements(issues)
     return suppress_duplicate_audit_issues(issues)
 
 def suppress_duplicate_audit_issues(issues: List[AuditIssue]) -> List[AuditIssue]:

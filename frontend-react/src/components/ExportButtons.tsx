@@ -1,28 +1,38 @@
 import { Download, FileJson, FileText } from "lucide-react";
 import type { AuditResponse } from "../types";
+import { useToast } from "../contexts/ToastContext";
 
 type ExportButtonsProps = {
   result: AuditResponse;
   fileName?: string;
 };
 
+function timestamp(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
 export function ExportButtons({ result, fileName = "audit-report" }: ExportButtonsProps) {
+  const { addToast } = useToast();
+  const ts = timestamp();
+  const mode = result.mode ?? "AUDIT";
+
   const handleExportJson = () => {
     const jsonStr = JSON.stringify(result, null, 2);
     const blob = new Blob([jsonStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${fileName}.json`;
+    a.download = `${fileName}_${ts}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    addToast("success", "JSON report downloaded");
   };
 
   const handleExportText = () => {
     const lines: string[] = [];
-    const mode = result.mode ?? "AUDIT";
     const textOutput = result.redacted_text || result.advisory_text || result.legacy_text;
     lines.push(`Zynexra ${mode.charAt(0)}${mode.slice(1).toLowerCase()} Report`);
     lines.push(`Generated: ${new Date().toISOString()}`);
@@ -69,11 +79,12 @@ export function ExportButtons({ result, fileName = "audit-report" }: ExportButto
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${fileName}.txt`;
+    a.download = `${fileName}_${ts}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    addToast("success", "Text summary downloaded");
   };
 
   return (
@@ -83,6 +94,7 @@ export function ExportButtons({ result, fileName = "audit-report" }: ExportButto
         type="button"
         onClick={handleExportJson}
         className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700"
+        title="Download JSON Report"
       >
         <FileJson className="h-4 w-4" />
         JSON
@@ -91,6 +103,7 @@ export function ExportButtons({ result, fileName = "audit-report" }: ExportButto
         type="button"
         onClick={handleExportText}
         className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700"
+        title="Download Text Summary"
       >
         <FileText className="h-4 w-4" />
         Text
@@ -99,6 +112,7 @@ export function ExportButtons({ result, fileName = "audit-report" }: ExportButto
         type="button"
         onClick={handleExportJson}
         className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700"
+        title="Download Report"
       >
         <Download className="h-4 w-4" />
       </button>

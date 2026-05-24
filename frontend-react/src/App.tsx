@@ -42,6 +42,7 @@ function AppContent() {
   const [isAdvisoryLoading, setIsAdvisoryLoading] = useState(false);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [historyRetryAttempt, setHistoryRetryAttempt] = useState(0);
+  const [isTakingLong, setIsTakingLong] = useState(false);
   const { addToast } = useToast();
   const connectionState = useConnection();
 
@@ -92,6 +93,12 @@ function AppContent() {
     setError(null);
     setApiError(null);
     setRetryAttempt(0);
+    setIsTakingLong(false);
+
+    const longTimer = setTimeout(() => {
+      setIsTakingLong(true);
+      addToast("warning", "Still analyzing your document. Complex files may take longer — your data remains private.");
+    }, 15000);
 
     try {
       addToast("loading", `Processing ${selectedFile.name}...`);
@@ -115,6 +122,7 @@ function AppContent() {
       logApiError("/ask_file", apiErr, { mode: selectedMode, filename: selectedFile?.name });
       await new Promise((r) => setTimeout(r, 280));
     } finally {
+      clearTimeout(longTimer);
       setIsLoading(false);
     }
   }
@@ -226,7 +234,7 @@ function AppContent() {
   // Dashboard view (new landing)
   if (appState === "DASHBOARD") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black">
         <TopNavigation currentMode="DASHBOARD" onModeChange={handleModeChange} />
         <DashboardPage onModeChange={handleModeChange} />
       </div>
@@ -246,7 +254,7 @@ function AppContent() {
   // Advisory view
   if (appState === "ADVISORY") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black">
         <TopNavigation currentMode="ADVISORY" onModeChange={handleModeChange} />
         <AdvisoryChatPage
           messages={advisoryMessages}
@@ -267,7 +275,7 @@ function AppContent() {
   // Redaction results view
   if (result?.mode === "REDACTION") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black">
         <TopNavigation currentMode="REDACTION" onModeChange={handleModeChange} />
         <RedactionResultsPage
           result={result}
