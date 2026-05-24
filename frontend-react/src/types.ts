@@ -43,6 +43,7 @@ export type AuditIssue = {
   quoted_text: string;
   risk_explanation: string;
   suggested_improvement: string;
+  contradiction_detected?: boolean;
 };
 
 export type RedactionEntityType =

@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Copy,
   Check,
+  Lightbulb,
 } from "lucide-react";
 import type { AuditIssue, SeverityLevel } from "../types";
 
@@ -15,12 +16,12 @@ type CollapsibleIssueCardProps = {
   index: number;
 };
 
-const severityConfig: Record<string, { bg: string; text: string; ring: string; border: string }> = {
-  CRITICAL: { bg: "bg-red-500/10", text: "text-red-400", ring: "ring-red-500/30", border: "border-red-500/20" },
-  HIGH: { bg: "bg-orange-500/10", text: "text-orange-400", ring: "ring-orange-500/30", border: "border-orange-500/20" },
-  MEDIUM: { bg: "bg-amber-500/10", text: "text-amber-400", ring: "ring-amber-500/30", border: "border-amber-500/20" },
-  LOW: { bg: "bg-emerald-500/10", text: "text-emerald-400", ring: "ring-emerald-500/30", border: "border-emerald-500/20" },
-  UNRATED: { bg: "bg-slate-500/10", text: "text-slate-400", ring: "ring-slate-500/30", border: "border-slate-500/20" },
+const severityConfig: Record<string, { bg: string; text: string; ring: string; border: string; strip: string; label: string }> = {
+  CRITICAL: { bg: "bg-red-500/10", text: "text-red-400", ring: "ring-red-500/30", border: "border-red-500/20", strip: "border-l-red-500/60", label: "CRITICAL" },
+  HIGH: { bg: "bg-orange-500/10", text: "text-orange-400", ring: "ring-orange-500/30", border: "border-orange-500/20", strip: "border-l-orange-500/60", label: "HIGH" },
+  MEDIUM: { bg: "bg-amber-500/10", text: "text-amber-400", ring: "ring-amber-500/30", border: "border-amber-500/20", strip: "border-l-amber-500/60", label: "MEDIUM" },
+  LOW: { bg: "bg-emerald-500/10", text: "text-emerald-400", ring: "ring-emerald-500/30", border: "border-emerald-500/20", strip: "border-l-emerald-500/60", label: "LOW" },
+  UNRATED: { bg: "bg-slate-500/10", text: "text-slate-400", ring: "ring-slate-500/30", border: "border-slate-500/20", strip: "border-l-slate-500/60", label: "UNRATED" },
 };
 
 function getSeverityConfig(severity: string) {
@@ -65,15 +66,17 @@ export function CollapsibleIssueCard({ issue, index }: CollapsibleIssueCardProps
   const title = issue.issue_title || `Issue ${index + 1}`;
 
   return (
-    <article className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60 shadow-sm transition-all duration-200 hover:border-slate-700">
+    <article
+      className={`overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60 shadow-sm transition-all duration-200 hover:border-slate-700 ${severity.strip} border-l-4`}
+    >
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-slate-800/30"
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10">
-            <span className="text-sm font-bold text-indigo-400">{index + 1}</span>
+          <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${severity.bg}`}>
+            <span className={`text-sm font-bold ${severity.text}`}>{index + 1}</span>
           </div>
           <div>
             <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -87,9 +90,9 @@ export function CollapsibleIssueCard({ issue, index }: CollapsibleIssueCardProps
         <div className="flex items-center gap-3">
           <div className="hidden flex-wrap gap-2 sm:flex">
             <span
-              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${severity.bg} ${severity.text} ${severity.ring}`}
+              className={`rounded-full px-2.5 py-0.5 text-xs font-bold tracking-wide ring-1 ${severity.bg} ${severity.text} ${severity.ring}`}
             >
-              {issue.severity || "UNRATED"}
+              {severity.label}
             </span>
             <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-400 ring-1 ring-slate-700/50">
               {issue.category || "Uncategorized"}
@@ -107,9 +110,9 @@ export function CollapsibleIssueCard({ issue, index }: CollapsibleIssueCardProps
         <div className="border-t border-slate-800 p-4">
           <div className="mb-4 flex gap-2 sm:hidden">
             <span
-              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${severity.bg} ${severity.text} ${severity.ring}`}
+              className={`rounded-full px-2.5 py-0.5 text-xs font-bold tracking-wide ring-1 ${severity.bg} ${severity.text} ${severity.ring}`}
             >
-              {issue.severity || "UNRATED"}
+              {severity.label}
             </span>
             <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-400 ring-1 ring-slate-700/50">
               {issue.category || "Uncategorized"}
@@ -125,7 +128,7 @@ export function CollapsibleIssueCard({ issue, index }: CollapsibleIssueCardProps
                 </div>
                 <CopyButton text={issue.quoted_text || ""} />
               </div>
-              <blockquote className="rounded-lg border-l-2 border-slate-700 bg-slate-950/50 px-4 py-3 font-mono text-sm leading-6 text-slate-400">
+              <blockquote className="rounded-lg border-l-4 border-slate-700 bg-slate-950/70 px-4 py-3 font-mono text-sm leading-6 text-slate-400">
                 {issue.quoted_text || "No quoted text returned."}
               </blockquote>
             </section>
@@ -141,12 +144,12 @@ export function CollapsibleIssueCard({ issue, index }: CollapsibleIssueCardProps
                 </p>
               </section>
 
-              <section className="rounded-lg border-l-2 border-emerald-500/30 bg-slate-800/30 p-4">
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-300">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <section className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-emerald-300">
+                  <Lightbulb className="h-4 w-4 text-emerald-400" />
                   Suggested Improvement
                 </div>
-                <p className="text-sm leading-6 text-slate-400">
+                <p className="text-sm leading-6 text-emerald-400/90">
                   {issue.suggested_improvement || "No suggested improvement returned."}
                 </p>
               </section>

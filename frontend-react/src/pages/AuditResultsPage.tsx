@@ -1,4 +1,4 @@
-import { ArrowLeft, AlertCircle, AlertTriangle, CheckCircle2, Eraser, FileSearch, MessageSquareText, ShieldCheck } from "lucide-react";
+import { ArrowLeft, AlertCircle, AlertTriangle, CheckCircle2, Eraser, FileSearch, MessageSquareText, ShieldCheck, ListChecks, ShieldAlert } from "lucide-react";
 import { CollapsibleIssueCard } from "../components/CollapsibleIssueCard";
 import { ExportButtons } from "../components/ExportButtons";
 import { EmptyState } from "../components/EmptyState";
@@ -14,6 +14,15 @@ type AuditResultsPageProps = {
   onReset: () => void;
 };
 
+type RiskLevel = "SAFE" | "LOW_RISK" | "MODERATE_RISK" | "HIGH_RISK";
+
+const riskLevelConfig: Record<RiskLevel, { label: string; bg: string; text: string; border: string; icon: React.ElementType }> = {
+  SAFE: { label: "SAFE", bg: "bg-emerald-500/15", text: "text-emerald-400", border: "border-emerald-500/30", icon: ShieldCheck },
+  LOW_RISK: { label: "LOW RISK", bg: "bg-emerald-500/15", text: "text-emerald-400", border: "border-emerald-500/30", icon: CheckCircle2 },
+  MODERATE_RISK: { label: "MODERATE RISK", bg: "bg-amber-500/15", text: "text-amber-400", border: "border-amber-500/30", icon: AlertCircle },
+  HIGH_RISK: { label: "HIGH RISK", bg: "bg-red-500/15", text: "text-red-400", border: "border-red-500/30", icon: ShieldAlert },
+};
+
 const severityConfig: Record<string, { label: string; bg: string; text: string; icon: React.ElementType }> = {
   CRITICAL: { label: "Critical", bg: "bg-red-500/10 text-red-400", text: "text-red-400", icon: AlertCircle },
   HIGH: { label: "High", bg: "bg-orange-500/10 text-orange-400", text: "text-orange-400", icon: AlertCircle },
@@ -21,6 +30,94 @@ const severityConfig: Record<string, { label: string; bg: string; text: string; 
   LOW: { label: "Low", bg: "bg-emerald-500/10 text-emerald-400", text: "text-emerald-400", icon: CheckCircle2 },
   UNRATED: { label: "Unrated", bg: "bg-slate-500/10 text-slate-400", text: "text-slate-400", icon: AlertCircle },
 };
+
+function classifyRiskLevel(issues: AuditResponse["issues"], confidenceScore?: number): RiskLevel {
+  const counts = getSeverityCounts(issues);
+  const hasContradictions = issues.some((i) => i.contradiction_detected);
+  const confidence = confidenceScore ?? 0;
+
+  if (counts.CRITICAL > 0 || counts.HIGH > 0) {
+    if (hasContradictions) return "HIGH_RISK";
+    if (confidence < 0.45) return "MODERATE_RISK";
+    return "HIGH_RISK";
+  }
+
+  if (counts.MEDIUM > 0) {
+    if (hasContradictions) return "HIGH_RISK";
+    return "MODERATE_RISK";
+  }
+
+  if (counts.LOW > 0) {
+    if (hasContradictions) return "MODERATE_RISK";
+    return "LOW_RISK";
+  }
+
+  return "SAFE";
+}
+
+function generateOneLineSummary(issues: AuditResponse["issues"], riskLevel: RiskLevel): string {
+  if (issues.length === 0) return "No compliance issues detected in this document.";
+
+  const criticalHigh = issues.filter((i) => i.severity === "CRITICAL" || i.severity === "HIGH");
+  const categories = [...new Set(issues.map((i) => i.category))];
+
+  if (riskLevel === "HIGH_RISK" && criticalHigh.length > 0) {
+    const topCat = criticalHigh[0].category;
+    return `High-risk ${topCat.toLowerCase()} and other critical concerns detected.`;
+  }
+
+  if (riskLevel === "MODERATE_RISK") {
+    const catStr = categories.slice(0, 2).join(" and ");
+    return `${catStr} concerns found. Review recommended before signing.`;
+  }
+
+  if (riskLevel === "LOW_RISK") {
+    return "Minor compliance observations. Document is generally sound.";
+  }
+
+  return "Document appears compliant. No significant issues found.";
+}
+
+function generateKeyFindings(issues: AuditResponse["issues"]): string[] {
+  const findings: string[] = [];
+  const usedTitles = new Set<string>();
+
+  const contradictions = issues.filter((i) => i.contradiction_detected);
+  for (const c of contradictions) {
+    const finding = `Contradictory ${c.category.toLowerCase()} clauses found`;
+    if (!usedTitles.has(finding)) {
+      findings.push(finding);
+      usedTitles.add(finding);
+    }
+  }
+
+  const severe = issues.filter((i) => i.severity === "CRITICAL" || i.severity === "HIGH");
+  for (const s of severe) {
+    let finding = s.issue_title;
+    if (finding && !finding.endsWith("detected") && !finding.endsWith("found")) {
+      finding = `${finding} detected`;
+    }
+    if (finding && !usedTitles.has(finding)) {
+      findings.push(finding);
+      usedTitles.add(finding);
+    }
+  }
+
+  const categories = [...new Set(issues.map((i) => i.category))];
+  for (const cat of categories) {
+    const exists = findings.some((f) => f.toLowerCase().includes(cat.toLowerCase()));
+    if (!exists) {
+      const catIssues = issues.filter((i) => i.category === cat);
+      if (catIssues.length > 1) {
+        findings.push(`Multiple ${cat.toLowerCase()} issues found`);
+      } else {
+        findings.push(`${cat} concern identified`);
+      }
+    }
+  }
+
+  return findings.slice(0, 5);
+}
 
 function SeveritySummary({ issues }: { issues: AuditResponse["issues"] }) {
   const counts = getSeverityCounts(issues);
@@ -50,49 +147,125 @@ function SeveritySummary({ issues }: { issues: AuditResponse["issues"] }) {
   );
 }
 
-function CategorySummary({ issues }: { issues: AuditResponse["issues"] }) {
-  const groups = groupIssuesByCategory(issues);
-
-  if (groups.length <= 1) return null;
-
-  return (
-    <div className="mt-3 flex flex-wrap gap-2">
-      {groups.map((group) => (
-        <span
-          key={group.category}
-          className="rounded-full bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-400"
-        >
-          {group.category}: {group.count}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function ConfidenceSection({ label, score }: { label: string; score: number }) {
   const percentage = Math.round(score * 100);
   const labelColor =
     label === "HIGH" ? "bg-emerald-500" : label === "MEDIUM" ? "bg-amber-500" : "bg-red-500";
 
   return (
-    <div className="mt-4 flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/60 px-5 py-4">
-      <div className="flex flex-col">
-        <span className="text-xs text-slate-500">Confidence</span>
-        <span className="text-2xl font-bold text-slate-100">{percentage}%</span>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-slate-500">Confidence Score</span>
+        <ConfidenceBadge confidence={score} label={label as "HIGH" | "MEDIUM" | "LOW"} showPercentage={false} size="sm" />
       </div>
-      <div className="flex flex-1 flex-col gap-1.5">
-        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
-          <div
-            className={`h-full rounded-full transition-all duration-1000 ease-out ${labelColor}`}
-            style={{ width: `${percentage}%` }}
-          />
-        </div>
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-slate-500">Score</span>
-          <ConfidenceBadge confidence={score} label={label as "HIGH" | "MEDIUM" | "LOW"} showPercentage={false} size="md" />
-        </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
+        <div
+          className={`h-full rounded-full transition-all duration-1000 ease-out ${labelColor}`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-slate-500">{percentage}%</span>
+        <span className="text-slate-600">{label}</span>
       </div>
     </div>
+  );
+}
+
+function RiskLevelBadge({ level }: { level: RiskLevel }) {
+  const config = riskLevelConfig[level];
+  const Icon = config.icon;
+
+  return (
+    <div className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 ${config.border} ${config.bg}`}>
+      <Icon className={`h-5 w-5 ${config.text}`} aria-hidden="true" />
+      <span className={`text-sm font-bold tracking-wide ${config.text}`}>{config.label}</span>
+    </div>
+  );
+}
+
+function AuditSummary({ issues, riskLevel, confidenceLabel, confidenceScore }: {
+  issues: AuditResponse["issues"];
+  riskLevel: RiskLevel;
+  confidenceLabel?: string;
+  confidenceScore?: number;
+}) {
+  const oneLiner = generateOneLineSummary(issues, riskLevel);
+
+  return (
+    <section
+      className="rounded-xl border border-slate-800 bg-gradient-to-br from-slate-900/90 to-slate-900/40 p-6 shadow-lg shadow-black/20"
+      aria-label="Audit summary at a glance"
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-center gap-4">
+          <RiskLevelBadge level={riskLevel} />
+          <div>
+            <span className="text-2xl font-bold text-slate-100">{issues.length}</span>
+            <span className="ml-1.5 text-slate-400">issue{issues.length !== 1 ? "s" : ""} found</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <SeveritySummary issues={issues} />
+      </div>
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        {confidenceLabel && confidenceScore !== undefined && (
+          <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-3">
+            <ConfidenceSection label={confidenceLabel} score={confidenceScore} />
+          </div>
+        )}
+
+        <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-3">
+          <div className="flex flex-col gap-2">
+            <span className="text-xs text-slate-500">Privacy</span>
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <ShieldCheck className="h-4 w-4 text-emerald-500" aria-hidden="true" />
+              <span>Processed locally</span>
+              <span className="text-slate-600">·</span>
+              <span className="text-slate-500">No cloud upload used</span>
+            </div>
+            <span className="text-xs text-slate-600">Local inference only</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 border-t border-slate-800 pt-4">
+        <p className="text-sm leading-relaxed text-slate-300">
+          <span className="font-semibold text-slate-200">Summary: </span>
+          {oneLiner}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function KeyFindingsPanel({ issues }: { issues: AuditResponse["issues"] }) {
+  const findings = generateKeyFindings(issues);
+
+  if (findings.length === 0) return null;
+
+  return (
+    <section
+      className="animate-fade-up rounded-xl border border-slate-800 bg-slate-900/40 px-5 py-4"
+      style={{ animationDelay: "150ms" }}
+      aria-label="Key findings"
+    >
+      <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+        <ListChecks className="h-4 w-4 text-indigo-400" aria-hidden="true" />
+        Key Findings
+      </div>
+      <ul className="mt-3 space-y-1.5">
+        {findings.map((finding, idx) => (
+          <li key={idx} className="flex items-start gap-2 text-sm text-slate-400">
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500/60" aria-hidden="true" />
+            <span>{finding}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -138,6 +311,7 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
   const confidenceScore = result.confidence_score;
   const isLowConfidence = confidenceLabel === "LOW";
   const isMediumConfidence = confidenceLabel === "MEDIUM";
+  const riskLevel = isAuditMode ? classifyRiskLevel(result.issues, confidenceScore) : null;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl animate-fade-up-long bg-gradient-to-b from-slate-900 via-slate-950 to-black px-5 py-8 sm:px-8">
@@ -148,15 +322,6 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
             {modeLabel}
           </p>
           <h1 className="mt-2 text-3xl font-semibold text-slate-100">{heading}</h1>
-          {isAuditMode ? (
-            <>
-              <SeveritySummary issues={result.issues} />
-              <CategorySummary issues={result.issues} />
-            </>
-          ) : null}
-          {confidenceLabel && confidenceScore !== undefined && (
-            <ConfidenceSection label={confidenceLabel} score={confidenceScore} />
-          )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-3 sm:flex-row">
           <ExportButtons result={result} />
@@ -170,6 +335,43 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
           </button>
         </div>
       </header>
+
+      {isAuditMode && !result.structured_parse_failed && (
+        <div className="mt-6 space-y-4">
+          <AuditSummary
+            issues={result.issues}
+            riskLevel={riskLevel ?? "SAFE"}
+            confidenceLabel={confidenceLabel}
+            confidenceScore={confidenceScore}
+          />
+          <KeyFindingsPanel issues={result.issues} />
+        </div>
+      )}
+
+      {!isAuditMode && confidenceLabel && confidenceScore !== undefined && (
+        <div className="mt-6">
+          <div className="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/60 px-5 py-4">
+            <div className="flex flex-col">
+              <span className="text-xs text-slate-500">Confidence</span>
+              <span className="text-2xl font-bold text-slate-100">{Math.round(confidenceScore * 100)}%</span>
+            </div>
+            <div className="flex flex-1 flex-col gap-1.5">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className={`h-full rounded-full transition-all duration-1000 ease-out ${
+                    confidenceLabel === "HIGH" ? "bg-emerald-500" : confidenceLabel === "MEDIUM" ? "bg-amber-500" : "bg-red-500"
+                  }`}
+                  style={{ width: `${Math.round(confidenceScore * 100)}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500">Score</span>
+                <ConfidenceBadge confidence={confidenceScore} label={confidenceLabel as "HIGH" | "MEDIUM" | "LOW"} showPercentage={false} size="md" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isLowConfidence && (
         <section className="mt-4 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
@@ -238,7 +440,7 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
                     <div
                       key={`${issue.location}-${issue.category}-${idx}`}
                       className="animate-fade-up"
-                      style={{ animationDelay: `${idx * 80}ms` }}
+                      style={{ animationDelay: `${400 + idx * 80}ms` }}
                     >
                       <CollapsibleIssueCard
                         issue={issue}
@@ -255,7 +457,7 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
                 <div
                   key={`${issue.location}-${issue.category}-${index}`}
                   className="animate-fade-up"
-                  style={{ animationDelay: `${index * 80}ms` }}
+                  style={{ animationDelay: `${400 + index * 80}ms` }}
                 >
                   <CollapsibleIssueCard
                     issue={issue}
