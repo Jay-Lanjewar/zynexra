@@ -31,6 +31,7 @@ from backend.engines.response_schemas import (
 from backend.logger import logger
 from backend.prompts import build_execution_prompt
 from backend.services.pdf_service import extract_text_from_pdf
+from backend.services.docx_service import extract_text_from_docx
 from backend.utils.timing import log_timing
 
 MODEL_NAME = settings.MODEL_FAST
@@ -566,8 +567,8 @@ def ask_file(
         filename = file.filename.lower() if file.filename else ""
         logger.info("Uploaded file received. session_id=%s filename=%s", session_id, filename)
         
-        if not filename.endswith((".txt", ".pdf")):
-            raise HTTPException(400, "Only .txt and .pdf files supported")
+        if not filename.endswith((".txt", ".pdf", ".docx")):
+            raise HTTPException(400, "Only .txt, .pdf, and .docx files supported")
 
         logger.info("Starting file processing. session_id=%s filename=%s", session_id, filename)
         file_read_start = time.time()
@@ -581,6 +582,8 @@ def ask_file(
         extraction_start = time.time()
         if filename.endswith(".pdf"):
             text = extract_text_from_pdf(content)
+        elif filename.endswith(".docx"):
+            text = extract_text_from_docx(content)
         else:
             # Default to .txt processing
             try:

@@ -250,8 +250,8 @@ export async function askAdvisoryQuestion(
 
 export function validateFile(file: File): ApiError | null {
   const MAX_SIZE_MB = 10;
-  const allowedTypes = ["application/pdf", "text/plain", "application/msword"];
-  const allowedExtensions = [".pdf", ".txt", ".doc"];
+  const allowedTypes = ["application/pdf", "text/plain", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+  const allowedExtensions = [".pdf", ".txt", ".doc", ".docx"];
 
   if (file.size > MAX_SIZE_MB * 1024 * 1024) {
     return { code: "FILE_TOO_LARGE", message: `File exceeds maximum size of ${MAX_SIZE_MB}MB.` };
@@ -261,7 +261,8 @@ export function validateFile(file: File): ApiError | null {
   const hasAllowedExtension = allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
 
   if (!hasAllowedType && !hasAllowedExtension) {
-    return { code: "INVALID_FILE_TYPE", message: "Only PDF, TXT, and DOC files are supported." };
+    return { code: "INVALID_FILE_TYPE", message: "Only PDF, TXT, DOC, and DOCX files are supported." };
+
   }
 
   return null;

@@ -67,7 +67,7 @@ export function ErrorState({ error, onReset }: ErrorStateProps) {
         return {
           icon: FileWarning,
           title: "Parsing Failed",
-          message: "The contract could not be parsed. Please ensure the file is a valid PDF, TXT, or DOC.",
+          message: "The contract could not be parsed. Please ensure the file is a valid PDF, TXT, DOC, or DOCX.",
           variant: "warning" as const,
         };
       case "FILE_TOO_LARGE":
@@ -81,7 +81,7 @@ export function ErrorState({ error, onReset }: ErrorStateProps) {
         return {
           icon: FileWarning,
           title: "Invalid File Type",
-          message: err.message || "Only PDF, TXT, and DOC files are supported.",
+          message: err.message || "Only PDF, TXT, DOC, and DOCX files are supported.",
           variant: "warning" as const,
         };
       default:

@@ -107,7 +107,7 @@ export function FileUploader({
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf,.txt,.doc,application/pdf,text/plain,application/msword"
+          accept=".pdf,.txt,.doc,.docx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           className="sr-only"
           onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
           disabled={isUploading}
@@ -148,7 +148,7 @@ export function FileUploader({
                 {isDragOver ? "Drop file here" : "Drag and drop your contract"}
               </p>
               <p className="text-sm text-slate-400">
-                or click to browse · PDF, TXT, DOC up to 10MB
+                or click to browse · PDF, TXT, DOC, DOCX up to 10MB
               </p>
             </div>
           </div>

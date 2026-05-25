@@ -1,19 +1,21 @@
-version: '3.9'
-
 services:
   backend:
-    build: .
+    build:
+      context: .
     container_name: zynexra_backend
     ports:
       - "8000:8000"
     restart: unless-stopped
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
 
   frontend:
-    build: .
+    build:
+      context: ./frontend-react
     container_name: zynexra_frontend
-    command: streamlit run frontend/app.py --server.port 8501 --server.address 0.0.0.0
+    command: npm run dev -- --host
     ports:
-      - "8501:8501"
+      - "5173:5173"
     restart: unless-stopped
     depends_on:
       - backend

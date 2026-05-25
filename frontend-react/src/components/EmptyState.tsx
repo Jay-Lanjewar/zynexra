@@ -72,7 +72,7 @@ const emptyStateContent = {
   },
   NO_FILE: {
     title: "No File Selected",
-    description: "Upload a contract file to begin the audit process. Supported formats: PDF, TXT, DOC.",
+    description: "Upload a contract file to begin the audit process. Supported formats: PDF, TXT, DOC, DOCX.",
     actionLabel: undefined,
   },
   NO_RECORDS: {
