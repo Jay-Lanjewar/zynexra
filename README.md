@@ -201,7 +201,7 @@ See `docs/ARCHITECTURE.md` for the full architecture documentation.
 
 ## Creator
 
-Zynexra was created by **Jay Lanjewar** in collaboration with **Priyani Patil**.
+Zynexra was created by **Jay Lanjewar**.
 
 ---
 
