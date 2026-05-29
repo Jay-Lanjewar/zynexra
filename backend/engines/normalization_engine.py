@@ -953,8 +953,12 @@ def sanitize_capped_indemnity_text(text: str) -> str:
         (r"\bunlimited liability\b", "capped liability"),
         (r"\buncapped indemnification\b", "capped indemnification"),
         (r"\bunlimited indemnification\b", "capped indemnification"),
+        (r"\buncapped exposure\b", "capped exposure"),
+        (r"\bunlimited exposure\b", "capped exposure"),
         (r"\bno cap\b", "a defined cap"),
         (r"\bno limit\b", "a defined limit"),
+        (r"\buncapped\b", "capped"),
+        (r"\bunlimited\b", "capped"),
     ]
     sanitized = text
     for pattern, replacement in replacements:
@@ -1032,6 +1036,10 @@ def normalize_audit_issue_fields(issues: List[AuditIssue]) -> List[AuditIssue]:
             new_category = "Indemnification"
         elif category_lower == "liability exposure" and indemnification_cues.search(combined_issue_text):
             new_category = "Indemnification"
+        elif category_lower == "enforceability weakness" and has_indemnity_context and has_explicit_cap:
+            new_category = "Indemnification"
+        elif category_lower == "legal risk exposure":
+            new_category = "Liability Exposure"
         elif category_lower == "residuals risk":
             new_category = "Residuals"
         elif category_lower == "governing law risk":
@@ -1279,8 +1287,12 @@ def normalize_issue_output(response_text: str) -> str:
             (r"\bunlimited liability\b", "capped liability"),
             (r"\buncapped indemnification\b", "capped indemnification"),
             (r"\bunlimited indemnification\b", "capped indemnification"),
+            (r"\buncapped exposure\b", "capped exposure"),
+            (r"\bunlimited exposure\b", "capped exposure"),
             (r"\bno cap\b", "a defined cap"),
             (r"\bno limit\b", "a defined limit"),
+            (r"\buncapped\b", "capped"),
+            (r"\bunlimited\b", "capped"),
         ]
         sanitized = text
         for pattern, replacement in replacements:
@@ -1343,6 +1355,10 @@ def normalize_issue_output(response_text: str) -> str:
             new_category = "Indemnification"
         elif category_lower == "liability exposure" and indemnification_cues.search(combined_issue_text):
             new_category = "Indemnification"
+        elif category_lower == "enforceability weakness" and has_indemnity_context and has_explicit_cap:
+            new_category = "Indemnification"
+        elif category_lower == "legal risk exposure":
+            new_category = "Liability Exposure"
         elif category_lower == "residuals risk":
             new_category = "Residuals"
         elif category_lower == "governing law risk":
