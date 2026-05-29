@@ -8,7 +8,13 @@ class Settings(BaseSettings):
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
 
-    MAX_FILE_SIZE: int = 20000
+    # Raw file size limits per type (in bytes)
+    MAX_PDF_SIZE: int = 25 * 1024 * 1024       # 25 MB
+    MAX_DOC_SIZE: int = 15 * 1024 * 1024       # 15 MB
+    MAX_TXT_SIZE: int = 2 * 1024 * 1024        # 2 MB
+
+    # Extracted text character limit
+    MAX_TEXT_LENGTH: int = 500000
 
     class Config:
         env_file = ".env"

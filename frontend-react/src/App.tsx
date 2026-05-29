@@ -3,6 +3,8 @@ import { askAdvisoryQuestion, auditContractFile, type ApiError, getHistoryRecord
 import { AdvisoryChatPage } from "./pages/AdvisoryChatPage";
 import { AuditResultsPage } from "./pages/AuditResultsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { NonLegalDocumentPage } from "./pages/NonLegalDocumentPage";
+import { PolicyNoticePage } from "./pages/PolicyNoticePage";
 import { RedactionResultsPage } from "./pages/RedactionResultsPage";
 import { UploadContractPage } from "./pages/UploadContractPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
@@ -267,6 +269,34 @@ function AppContent() {
           onModeChange={handleModeChange}
           onRetry={advisoryError ? handleAdvisoryRetry : undefined}
           isRetrying={isAdvisoryLoading}
+        />
+      </div>
+    );
+  }
+
+  // Policy notice view (non-contract policy documents)
+  if (result?.response_type === "policy") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black">
+        <TopNavigation currentMode="AUDIT" onModeChange={handleModeChange} />
+        <PolicyNoticePage
+          result={result}
+          error={apiError}
+          onReset={handleReset}
+        />
+      </div>
+    );
+  }
+
+  // Non-legal document view (educational material, notes, questions, general text)
+  if (result?.response_type === "non_legal") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black">
+        <TopNavigation currentMode="AUDIT" onModeChange={handleModeChange} />
+        <NonLegalDocumentPage
+          result={result}
+          error={apiError}
+          onReset={handleReset}
         />
       </div>
     );

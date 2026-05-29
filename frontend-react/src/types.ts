@@ -74,11 +74,51 @@ export type RedactionOptions = {
   companies: boolean;
 };
 
+export type PolicyNotice = {
+  success: boolean;
+  model: string;
+  mode?: AppMode;
+  response_type: "policy";
+  issue_count: number;
+  issues: AuditIssue[];
+  structured_parse_failed?: boolean;
+  legacy_text?: string;
+  policy_type: string;
+  policy_explanation: string;
+  policy_confidence: number;
+  metadata?: ConfidenceMetadata & {
+    policy_keyword_score?: number;
+    contractual_signal_score?: number;
+    policy_keywords?: string[];
+  };
+};
+
+export type NonLegalNotice = {
+  success: boolean;
+  model: string;
+  mode?: AppMode;
+  response_type: "non_legal";
+  issue_count: number;
+  issues: AuditIssue[];
+  structured_parse_failed?: boolean;
+  legacy_text?: string;
+  content_type: string;
+  content_explanation: string;
+  domain_confidence: number;
+  legal_keyword_ratio: number;
+  structure_score: number;
+  metadata?: ConfidenceMetadata & {
+    domain?: string;
+    legal_signal?: number;
+    non_legal_penalty?: number;
+  };
+};
+
 export type AuditResponse = {
   success: boolean;
   model: string;
   mode?: AppMode;
-  response_type?: "audit" | "redaction" | "advisory" | "legacy";
+  response_type?: "audit" | "redaction" | "advisory" | "legacy" | "policy" | "non_legal";
   issue_count: number;
   issues: AuditIssue[];
   structured_parse_failed?: boolean;
@@ -92,7 +132,7 @@ export type AuditResponse = {
   confidence_score?: number;
   confidence_label?: ConfidenceLabel;
   metadata?: ConfidenceMetadata;
-};
+} & Partial<PolicyNotice> & Partial<NonLegalNotice>;
 
 export type CategoryGroup = {
   category: string;

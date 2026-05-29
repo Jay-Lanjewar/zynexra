@@ -21,7 +21,7 @@ type Stage = {
 
 const auditStages: Stage[] = [
   { id: "extracting", label: "Extracting document text" },
-  { id: "detecting", label: "Detecting legal structure" },
+  { id: "detecting", label: "Detecting document type" },
   { id: "analyzing", label: "Analyzing risk clauses" },
   { id: "checking", label: "Checking contradictions" },
   { id: "evaluating", label: "Evaluating confidence" },
@@ -53,6 +53,9 @@ const statusMessages = [
   "Analyzing non-compete terms...",
   "Inspecting data protection language...",
   "Cross-referencing governing law...",
+  "Classifying document type...",
+  "Checking for policy signals...",
+  "Detecting contractual language...",
 ];
 
 const timeoutMessages = [
@@ -65,6 +68,7 @@ const timeoutMessages = [
 const stageIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   extracting: FileText,
   detecting: Search,
+  classifying: Search,
   analyzing: AlertTriangle,
   scanning: Search,
   checking: GitBranch,

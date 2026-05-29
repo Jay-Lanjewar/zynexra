@@ -22,11 +22,22 @@ from backend.engines.response_schemas import (
     build_audit_response,
     build_redaction_response,
     build_advisory_response,
+    build_policy_response,
+    build_non_legal_response,
+    classify_non_legal_content,
     build_refusal_response,
     convert_history_record_to_response,
     get_legacy_text_for_export,
     validate_response,
     SCHEMA_VERSION,
+)
+from backend.engines.policy_detection_engine import (
+    detect_policy_document,
+    PolicyDetection,
+)
+from backend.engines.legal_domain_engine import (
+    compute_document_domain_confidence,
+    DocumentDomain,
 )
 from backend.logger import logger
 from backend.prompts import build_execution_prompt
@@ -579,6 +590,14 @@ def ask_file(
             
         file.file.close()
 
+        # Check raw file size against per-type limits before extraction
+        if filename.endswith(".pdf") and len(content) > settings.MAX_PDF_SIZE:
+            raise HTTPException(400, "File exceeds maximum size. PDF files must be under 25MB.")
+        if filename.endswith(".docx") and len(content) > settings.MAX_DOC_SIZE:
+            raise HTTPException(400, "File exceeds maximum size. DOCX files must be under 15MB.")
+        if filename.endswith(".txt") and len(content) > settings.MAX_TXT_SIZE:
+            raise HTTPException(400, "File exceeds maximum size. TXT files must be under 2MB.")
+
         extraction_start = time.time()
         if filename.endswith(".pdf"):
             text = extract_text_from_pdf(content)
@@ -593,7 +612,7 @@ def ask_file(
                 raise HTTPException(400, f"File encoding error: {str(e)}")
         log_timing("File extraction", extraction_start)
 
-        if len(text) > 20000:
+        if len(text) > settings.MAX_TEXT_LENGTH:
             raise HTTPException(400, "Document too large. Please upload a smaller file.")
         
         if mode:
@@ -675,6 +694,104 @@ def ask_file(
                 media_type="text/plain"
             )
          
+        # -------------------------
+        # Policy/Procedure Document Detection
+        # -------------------------
+        policy_detection_start = time.time()
+        policy_result = detect_policy_document(text)
+        if policy_result.detection == PolicyDetection.POLICY:
+            log_timing("Policy detection", policy_detection_start)
+            logger.warning(
+                "[PolicyDetection] POLICY DOCUMENT DETECTED — short-circuiting LLM pipeline. "
+                "type=%s confidence=%.4f", policy_result.policy_type, policy_result.confidence,
+            )
+            policy_response = build_policy_response(
+                model=MODEL_NAME,
+                policy_type=policy_result.policy_type,
+                policy_explanation=policy_result.explanation,
+                policy_confidence=policy_result.confidence,
+                metadata={
+                    "model_name": MODEL_NAME,
+                    "policy_keyword_score": round(policy_result.policy_keyword_score, 4),
+                    "contractual_signal_score": round(policy_result.contractual_signal_score, 4),
+                    "policy_keywords": policy_result.matched_policy_keywords,
+                },
+            )
+            session["last_report"] = f"[POLICY NOTICE] {policy_result.policy_type}: {policy_result.explanation}"
+            session["last_structured_response"] = policy_response
+
+            if json_response_mode:
+                return JSONResponse(policy_response)
+
+            return StreamingResponse(
+                response_generator.stream_to_user(
+                    f"[POLICY NOTICE]\n\nThis document has been identified as a policy or procedure document, "
+                    f"not a contractual agreement.\n\nClassification: {policy_result.policy_type}\n\n"
+                    f"{policy_result.explanation}\n\n"
+                    f"Policy documents are not processed through the legal-risk audit pipeline."
+                ),
+                media_type="text/plain",
+            )
+        log_timing("Policy detection", policy_detection_start)
+        logger.info(
+            "[PolicyDetection] No policy detected: detection=%s confidence=%.4f",
+            policy_result.detection.value, policy_result.confidence,
+        )
+
+        # -------------------------
+        # Non-Legal Document Detection
+        # -------------------------
+        non_legal_start = time.time()
+        domain_result = compute_document_domain_confidence(text)
+        domain_is_non_legal = domain_result.domain == DocumentDomain.NON_LEGAL
+        if domain_is_non_legal:
+            log_timing("Non-legal detection", non_legal_start)
+            content_type, content_explanation, _ = classify_non_legal_content(text)
+            logger.warning(
+                "[NonLegalDetection] NON-LEGAL DOCUMENT DETECTED — short-circuiting LLM pipeline. "
+                "type=%s domain_confidence=%.4f legal_keyword_ratio=%.4f structure_score=%.4f",
+                content_type, domain_result.confidence,
+                domain_result.legal_keyword_ratio, domain_result.structure_score,
+            )
+            non_legal_response = build_non_legal_response(
+                model=MODEL_NAME,
+                content_type=content_type,
+                content_explanation=content_explanation,
+                domain_confidence=domain_result.confidence,
+                legal_keyword_ratio=domain_result.legal_keyword_ratio,
+                structure_score=domain_result.structure_score,
+                metadata={
+                    "model_name": MODEL_NAME,
+                    "domain": domain_result.domain.value,
+                    "legal_signal": round(domain_result.factors.get("legal_signal", 0), 4),
+                    "non_legal_penalty": round(domain_result.factors.get("non_legal_penalty", 0), 4),
+                },
+            )
+            session["last_report"] = f"[NON-LEGAL NOTICE] {content_type}: {content_explanation}"
+            session["last_structured_response"] = non_legal_response
+
+            if json_response_mode:
+                return JSONResponse(non_legal_response)
+
+            return StreamingResponse(
+                response_generator.stream_to_user(
+                    f"[NON-LEGAL DOCUMENT NOTICE]\n\n"
+                    f"This document does not appear to be a legal contract or agreement.\n\n"
+                    f"Classification: {content_type}\n\n"
+                    f"{content_explanation}\n\n"
+                    f"The legal-risk audit pipeline requires contractual documents with identifiable "
+                    f"legal structure, parties, obligations, and binding language. Non-contract "
+                    f"content such as educational materials, notes, questions, or general text "
+                    f"is not processed through this pipeline."
+                ),
+                media_type="text/plain",
+            )
+        log_timing("Non-legal detection", non_legal_start)
+        logger.info(
+            "[NonLegalDetection] Domain appears legal: domain=%s confidence=%.4f",
+            domain_result.domain.value, domain_result.confidence,
+        )
+
         # Build isolated messages for file analysis (no history)
         # -------------------------
         # RAG Retrieval Layer (disabled; uncomment when re-enabling RAG)
@@ -706,7 +823,16 @@ def ask_file(
         log_timing("Prompt build", prompt_start)
 
         inference_start = time.time()
-        raw_response, fallback_used = response_generator.generate_response(messages, settings.MODEL_FAST, effective_mode)
+
+        try:
+            raw_response, fallback_used = response_generator.generate_response(
+                messages,
+                settings.MODEL_FAST,
+                effective_mode
+            )
+        except Exception as e:
+            logger.exception("MODEL GENERATION FAILED")
+            raise HTTPException(500, f"Model generation failed: {str(e)}")
         inference_duration_ms = (time.time() - inference_start) * 1000
         logger.info("[Perf] inference_ms=%.0f", inference_duration_ms)
         logger.info("[FallbackTrace] stage=app_file_upload_handoff fallback_used=%s", fallback_used)
@@ -770,7 +896,7 @@ def ask_file(
                     )
             except Exception as e:
                 logger.warning(f"Failed to persist audit: {str(e)}")
-            
+                raise HTTPException(400, f"Processing failed: {str(e)}")
             return JSONResponse(structured)
 
         return StreamingResponse(
@@ -783,7 +909,7 @@ def ask_file(
         raise
     except Exception as e:
         # Handle any unexpected file processing errors
-        logger.error("Unexpected file processing error. session_id=%s filename=%s error=%s", session_id, file.filename, e)
+        logger.exception("Unexpected file processing error. session_id=%s filename=%s error=%s", session_id, file.filename, e)
         raise HTTPException(500, f"File processing error: {str(e)}")
 
 @app.post("/reset")

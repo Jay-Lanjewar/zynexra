@@ -30,7 +30,7 @@ class DomainDetectionResult:
     factors: Dict[str, float] = field(default_factory=dict)
 
 
-NON_LEGAL_THRESHOLD = 0.10
+NON_LEGAL_THRESHOLD = 0.08
 POSSIBLY_LEGAL_THRESHOLD = 0.20
 
 # Single-word legal keywords (checked via word tokenization)
@@ -188,6 +188,69 @@ LEGAL_KEYWORDS: Set[str] = {
     "purpose", "purposes",
     "intend", "intends", "intended", "intention",
     "contemplate", "contemplates", "contemplated",
+    # Extended legal/business keywords for broader contract coverage
+    "contract", "contracts", "contractual",
+    "services", "service",
+    "provider", "providers",
+    "deliverable", "deliverables",
+    "intellectual",
+    "payment", "payments", "payable",
+    "fee", "fees",
+    "cost", "costs", "costing",
+    "invoice", "invoices",
+    "project", "projects",
+    "scope",
+    "acceptance", "accept",
+    "approval", "approve", "approved",
+    "data",
+    "privacy",
+    "security",
+    "software",
+    "technology", "technologies",
+    "professional",
+    "consulting", "consultant", "consultants",
+    "vendor", "vendors",
+    "supplier", "suppliers",
+    "customer", "customers",
+    "client", "clients",
+    "grant", "grants",
+    "sponsor", "sponsors", "sponsored", "sponsorship",
+    "research",
+    "collaboration", "collaborate",
+    "subcontract", "subcontractor", "subcontractors",
+    "teaming",
+    "procurement", "procure",
+    "solicitation", "solicit",
+    "respondent", "respondents",
+    "proposal", "proposals",
+    "bid", "bids", "bidding",
+    "tender", "tenders",
+    "quote", "quotes", "quotation",
+    "rates", "rate",
+    "hourly", "monthly", "annual", "quarterly",
+    "retainer", "retainers",
+    "reimbursement", "reimburse", "reimbursable",
+    "audit", "audits", "auditing",
+    "inspection", "inspect",
+    "certification", "certify", "certified",
+    "insurance", "insure", "insured",
+    "indemnitor", "indemnitee",
+    "prevail", "prevailing",
+    "substantial", "substantially",
+    "materiality", "material",
+    "knowledge",
+    "belief", "believe",
+    "aware", "awareness",
+    "notify", "notification", "notified", "notifies",
+    "approve", "approval", "approved",
+    "authorize", "authorization", "authorized", "authorizes",
+    "consent", "consents", "consented",
+    "waiver", "waive", "waived", "waives",
+    "release", "releases", "released",
+    "discharge", "discharged",
+    "satisfy", "satisfaction", "satisfied",
+    "fulfill", "fulfilled", "fulfillment",
+    "complete", "completes", "completed", "completion",
 }
 
 # Multi-word legal phrases for density calculation
@@ -262,11 +325,58 @@ LEGAL_PHRASES: Set[str] = {
     "herein contained", "herein set forth",
     "therein contained", "therein set forth",
     "by and between", "among and between",
+    # Extended contract/business phrases for broader coverage
+    "service provider", "services provider",
+    "scope of work", "statement of work",
+    "intellectual property", "intellectual property rights",
+    "third party", "third-party", "third parties",
+    "work product", "work for hire",
+    "payment terms", "payment schedule",
+    "fee schedule", "fee structure",
+    "professional services", "consulting services",
+    "mutual agreement", "mutual consent",
+    "written notice", "prior written notice",
+    "prior written consent", "written consent",
+    "reasonable efforts", "commercially reasonable efforts",
+    "best efforts", "reasonable endeavours",
+    "data protection", "data privacy",
+    "personal data", "personal information",
+    "confidential treatment", "confidential information",
+    "security breach", "data breach",
+    "acceptance criteria", "acceptance testing",
+    "delivery schedule", "delivery timeline",
+    "project plan", "project schedule",
+    "key personnel", "key staff",
+    "change order", "change request",
+    "statement of work", "scope of services",
+    "service level", "service levels",
+    "service level agreement", "service level objective",
+    "standard of care", "standard of work",
+    "warranty period", "warranty term",
+    "defect remedy", "remedy period",
+    "error correction", "bug fix",
+    "maintenance and support", "support and maintenance",
+    "transition assistance", "transition services",
+    "termination for convenience", "termination for cause",
+    "termination for breach", "termination upon breach",
+    "expiration of the term", "end of the term",
+    "renewal term", "renewal period", "automatic renewal",
+    "initial term", "initial period",
+    "notice period", "notice of termination",
+    "cure period", "grace period",
+    "governing law and jurisdiction", "governing law and venue",
+    "exclusive jurisdiction", "non-exclusive jurisdiction",
+    "waiver of jury", "jury trial waiver",
+    "class action", "class action waiver",
+    "attorney fees", "attorneys' fees",
+    "legal fees", "court costs",
+    "costs and expenses", "expenses and costs",
+    "prevailing party", "substantially prevailing party",
 }
 
 # Patterns that indicate contract structure
 CONTRACT_STRUCTURE_PATTERNS = [
-    re.compile(r"(?im)^\s*(?:this\s+)?(?:confidentiality|non.?disclosure|mutual|unilateral|bilateral|service|license|master|employment|consulting|settlement|purchase|supply|distributor|franchise|joint venture|partnership|shareholder|subscription|membership|software|development|professional services|outsourcing|sponsorship|marketing|advertising|agency|broker|management|consultancy|advisory|loan|credit|finance|leasing|rental|warranty|guaranty|indemnity|escrow|custody|clearing|settlement|collateral|security|pledge|hypothecation)\s+(?:agreement|contract|understanding|instrument)\b"),
+    re.compile(r"(?im)^\s*(?:this\s+)?(?:confidentiality|non.?disclosure|mutual|unilateral|bilateral|service|license|master|employment|consulting|consultancy|settlement|purchase|supply|distributor|franchise|joint venture|partnership|shareholder|subscription|membership|software|development|professional services|outsourcing|sponsorship|sponsored|marketing|advertising|agency|broker|management|advisory|loan|credit|finance|leasing|rental|warranty|guaranty|indemnity|escrow|custody|clearing|settlement|collateral|security|pledge|hypothecation|research|collaboration|grant|material transfer|teaming|subcontract|subcontracting|procurement|consultant|vendor|supplier|fabrication|manufacturing|technology transfer|clinical trial|clinical|testing|evaluation|feasibility|studies|funding|endowment|fellowship|scholarship|internship|trainee|apprenticeship|exchange|secondment|assignment)\s+(?:agreement|contract|understanding|instrument|deed|letter|arrangement|terms)\b"),
     re.compile(r"(?im)^\s*\d+\.\s+[A-Z]"),
     re.compile(r"(?im)^\s*(?:article|section|clause|paragraph|schedule|exhibit|appendix|annex)\s+\d+"),
     re.compile(r"(?im)^\s*whereas\b"),
@@ -419,10 +529,14 @@ def compute_document_domain_confidence(text: str) -> DomainDetectionResult:
 
     suppression_triggered = domain == DocumentDomain.NON_LEGAL
 
-    logger.info("[DomainDetection] domain=%s", domain.value)
-    logger.info("[DomainDetection] legal_keyword_ratio=%.4f", legal_keyword_ratio)
-    logger.info("[DomainDetection] structure_score=%.4f", structure_score)
-    logger.info("[DomainDetection] suppression_triggered=%s", suppression_triggered)
+    logger.info("[DomainDetection] domain=%s effective_score=%.4f "
+                "legal_keyword_ratio=%.4f structure_score=%.4f "
+                "legal_phrase_density=%.4f non_legal_penalty=%.4f "
+                "legal_signal=%.4f suppression_triggered=%s input_length=%d",
+                domain.value, effective_score,
+                legal_keyword_ratio, structure_score,
+                legal_phrase_density, non_legal_penalty,
+                legal_signal, suppression_triggered, len(text))
 
     return DomainDetectionResult(
         domain=domain,

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, List, Optional
 from enum import Enum
+import re
 import time
 
 from backend.logger import logger
@@ -430,6 +431,170 @@ def get_legacy_text_for_export(record: Dict[str, Any], record_type: str) -> str:
             )
         return str(messages)
     return ""
+
+
+@dataclass
+class PolicyResponse:
+    success: bool = True
+    model: str = ""
+    mode: str = "AUDIT"
+    response_type: str = "policy"
+    schema_version: int = SCHEMA_VERSION
+    issue_count: int = 0
+    issues: List[Any] = field(default_factory=list)
+    structured_parse_failed: bool = False
+    legacy_text: str = ""
+    policy_type: str = ""
+    policy_explanation: str = ""
+    policy_confidence: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+def build_policy_response(
+    model: str,
+    policy_type: str,
+    policy_explanation: str,
+    policy_confidence: float = 0.0,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    response = PolicyResponse(
+        success=True,
+        model=model,
+        mode="AUDIT",
+        response_type="policy",
+        schema_version=SCHEMA_VERSION,
+        issue_count=0,
+        issues=[],
+        structured_parse_failed=False,
+        legacy_text="",
+        policy_type=policy_type,
+        policy_explanation=policy_explanation,
+        policy_confidence=policy_confidence,
+        metadata=metadata or {},
+    )
+
+    logger.info("[PolicyDetection] Policy response built: type=%s confidence=%.4f", policy_type, policy_confidence)
+    return response.to_dict()
+
+
+@dataclass
+class NonLegalResponse:
+    success: bool = True
+    model: str = ""
+    mode: str = "AUDIT"
+    response_type: str = "non_legal"
+    schema_version: int = SCHEMA_VERSION
+    issue_count: int = 0
+    issues: List[Any] = field(default_factory=list)
+    structured_parse_failed: bool = False
+    legacy_text: str = ""
+    content_type: str = ""
+    content_explanation: str = ""
+    domain_confidence: float = 0.0
+    legal_keyword_ratio: float = 0.0
+    structure_score: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+NON_LEGAL_CONTENT_TYPES: Dict[str, str] = {
+    "Educational Material": "This document appears to be educational or instructional content such as textbook excerpts, lecture notes, study guides, or learning materials.",
+    "Questions or Assignments": "This document appears to contain questions, problem sets, assignments, or examination content rather than a contractual agreement.",
+    "General Text or Notes": "This document appears to be general text, notes, articles, or other non-contractual written content.",
+    "Non-Contract Communication": "This document appears to be a non-contractual communication such as a memo, email, announcement, or informal message.",
+    "Uncategorized Non-Legal": "This document does not appear to be a legal contract, agreement, or policy document. It likely contains general information or narrative text.",
+}
+
+NON_LEGAL_CONTENT_PATTERNS: Dict[str, list] = {
+    "Educational Material": [
+        r"(?i)\b(?:chapter|textbook|syllabus|curriculum|course\s+(?:outline|content|material|notes?|work)|lecture\s+(?:notes?|content|slides?)|study\s+(?:guide|material|notes?)|learning\s+(?:objective|outcome|resource)|lesson\s+(?:plan|content)|tutorial|worksheet|handout)\b",
+        r"(?i)\b(?:define|explain|discuss|describe|compare|contrast|summarize|outline|identify|list|illustrate)\b.*\?",
+        r"(?i)\b(?:equation|formula|theorem|proof|hypothesis|experiment|laboratory|lab\s+(?:report|manual|exercise))\b",
+    ],
+    "Questions or Assignments": [
+        r"(?i)\b(?:question|answer|problem\s+(?:set|statement)|assignment|homework|exercise|task)\b",
+        r"(?i)^\s*(?:\d+[\.\)]\s*|[A-Z][\.\)]\s*)(?:what|which|who|where|when|why|how|explain|describe|define|list|compare)\b",
+        r"(?i)\b(?:multiple\s+choice|true\s*(?:/|or)\s*false|fill\s+in\s+the\s+blank|short\s+answer|essay\s+question)\b",
+    ],
+    "General Text or Notes": [
+        r"(?i)\b(?:note|notes|summary|overview|introduction|background|context|purpose\s+of\s+(?:this|the))\b",
+        r"(?i)\b(?:i\s+(?:think|believe|feel|argue|contend|propose|suggest|would\s+say))\b",
+        r"(?i)\b(?:in\s+(?:this|my)\s+(?:paper|essay|article|post|report|analysis))\b",
+    ],
+    "Non-Contract Communication": [
+        r"(?i)\b(?:dear|hello|hi|greetings)\s+(?:all|team|everyone|colleagues?|sir|madam)\b",
+        r"(?i)\b(?:thanks|thank\s+you|regards|sincerely|best|cheers)\s*[,!]?\s*$",
+        r"(?i)\b(?:meeting\s+(?:notes?|minutes?|agenda|summary|recap)|follow.up|action\s+items?)\b",
+    ],
+}
+
+NON_LEGAL_SUPPRESSION_MESSAGE = (
+    "This document does not appear to be a legal contract or agreement and has "
+    "been flagged as non-contract content: {content_type}. Only contractual "
+    "documents are processed through the legal-risk audit pipeline."
+)
+
+
+def classify_non_legal_content(text: str) -> tuple[str, str, float]:
+    """Classify the type of non-legal content detected in the text."""
+    if not text or not text.strip():
+        return "Uncategorized Non-Legal", NON_LEGAL_CONTENT_TYPES["Uncategorized Non-Legal"], 0.0
+
+    best_type = "Uncategorized Non-Legal"
+    best_score = 0.0
+    text_lower = text.lower()
+
+    for content_type, patterns in NON_LEGAL_CONTENT_PATTERNS.items():
+        score = 0.0
+        for pattern in patterns:
+            matches = len(re.findall(pattern, text_lower))
+            score += matches
+        avg = score / len(patterns) if patterns else 0.0
+        if avg > best_score:
+            best_score = avg
+            best_type = content_type
+
+    explanation = NON_LEGAL_CONTENT_TYPES.get(best_type, NON_LEGAL_CONTENT_TYPES["Uncategorized Non-Legal"])
+    return best_type, explanation, best_score
+
+
+def build_non_legal_response(
+    model: str,
+    content_type: str,
+    content_explanation: str,
+    domain_confidence: float = 0.0,
+    legal_keyword_ratio: float = 0.0,
+    structure_score: float = 0.0,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    response = NonLegalResponse(
+        success=True,
+        model=model,
+        mode="AUDIT",
+        response_type="non_legal",
+        schema_version=SCHEMA_VERSION,
+        issue_count=0,
+        issues=[],
+        structured_parse_failed=False,
+        legacy_text="",
+        content_type=content_type,
+        content_explanation=content_explanation,
+        domain_confidence=domain_confidence,
+        legal_keyword_ratio=legal_keyword_ratio,
+        structure_score=structure_score,
+        metadata=metadata or {},
+    )
+
+    logger.info(
+        "[NonLegalDetection] Non-legal response built: type=%s domain_confidence=%.4f",
+        content_type, domain_confidence,
+    )
+    return response.to_dict()
 
 
 def build_refusal_response(refusal_message: str, model: str, mode: str = "AUDIT") -> Dict[str, Any]:

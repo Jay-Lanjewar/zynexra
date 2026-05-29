@@ -8,6 +8,10 @@ from backend.logger import logger
 from backend.engines.response_schemas import (
     build_audit_response,
     build_advisory_response,
+    build_policy_response,
+    build_non_legal_response,
+    classify_non_legal_content,
+    NON_LEGAL_SUPPRESSION_MESSAGE,
     SCHEMA_VERSION,
 )
 from backend.engines.confidence_engine import audit_scorer, advisory_scorer
@@ -21,6 +25,11 @@ from backend.engines.legal_domain_engine import (
     compute_document_domain_confidence,
     DocumentDomain,
     DOMAIN_SUPPRESSION_MESSAGE,
+)
+from backend.engines.policy_detection_engine import (
+    detect_policy_document,
+    PolicyDetection,
+    POLICY_SUPPRESSION_MESSAGE,
 )
 from backend.engines.recommendation_refiner import refine_suggested_improvements
 
@@ -386,12 +395,13 @@ def _try_parse_json(text: str) -> Optional[List[AuditIssue]]:
 def parse_audit_issues(response_text: str) -> List[AuditIssue]:
     # Sanitize unescaped control characters so JSON parsing doesn't choke
     response_text = _sanitize_json_strings(response_text)
+    response_len = len(response_text)
     issues = parse_audit_issues_from_json(response_text)
     if issues:
         logger.info(
             "[StructuredOutcome] strict_json_success=True repair_success=False "
-            "fallback_used=False issues_extracted=%d",
-            len(issues)
+            "fallback_used=False issues_extracted=%d response_length=%d",
+            len(issues), response_len
         )
         return issues
 
@@ -400,14 +410,14 @@ def parse_audit_issues(response_text: str) -> List[AuditIssue]:
         result = _try_parse_json(candidate)
         if result is not None:
             issues = result
-            logger.info("[StructuredRepair] recovery_success=True")
+            logger.info("[StructuredRepair] recovery_success=True method=json_repair")
             break
 
     if issues:
         logger.info(
             "[StructuredOutcome] strict_json_success=False repair_success=True "
-            "fallback_used=False issues_extracted=%d",
-            len(issues)
+            "fallback_used=False issues_extracted=%d response_length=%d",
+            len(issues), response_len
         )
         return issues
 
@@ -421,7 +431,7 @@ def parse_audit_issues(response_text: str) -> List[AuditIssue]:
                 result = _try_parse_json(prefix)
                 if result is not None:
                     issues = result
-                    logger.info("[StructuredRepair] recovery_success=True")
+                    logger.info("[StructuredRepair] recovery_success=True method=truncation")
                     break
         if issues:
             break
@@ -429,20 +439,23 @@ def parse_audit_issues(response_text: str) -> List[AuditIssue]:
     if issues:
         logger.info(
             "[StructuredOutcome] strict_json_success=False repair_success=True "
-            "fallback_used=False issues_extracted=%d",
-            len(issues)
+            "fallback_used=False issues_extracted=%d response_length=%d",
+            len(issues), response_len
         )
         return issues
 
-    logger.warning("[Structured] Fallback to text parsing triggered")
+    logger.warning("[Structured] Fallback to text parsing triggered response_length=%d",
+                   response_len)
     issues = parse_audit_issues_from_text(response_text)
     fallback_used = len(issues) > 0
 
     logger.info(
         "[StructuredOutcome] strict_json_success=False repair_success=False "
-        "fallback_used=%s issues_extracted=%d",
-        fallback_used, len(issues)
+        "fallback_used=%s issues_extracted=%d response_length=%d",
+        fallback_used, len(issues), response_len
     )
+    if not fallback_used:
+        logger.warning("[ParserFailure] All parsing strategies exhausted for response_length=%d", response_len)
     return issues
 
 def is_json_response_mode(response_format: Optional[str]) -> bool:
@@ -519,6 +532,8 @@ def build_audit_json_payload(
 ) -> Dict[str, Any]:
     """Build a machine-readable audit response with single-pass processing."""
     logger.info("[FallbackTrace] stage=build_audit_json_payload_entry fallback_used=%s", fallback_used)
+    logger.info("[InputMetrics] extracted_text_length=%d complete_response_length=%d",
+                len(user_input), len(complete_response))
     pipeline_start = time.time()
 
     # --- Parse ---
@@ -526,6 +541,8 @@ def build_audit_json_payload(
     issues = parse_audit_issues(complete_response)
     parse_failed = len(issues) == 0
     parse_ms = (time.time() - parse_start) * 1000
+    if parse_failed:
+        logger.info("[FallbackTrace] stage=parse_failed fallback_used=%s", fallback_used)
 
     # --- Normalization ---
     norm_start = time.time()
@@ -566,25 +583,109 @@ def build_audit_json_payload(
         parse_failed = True
         complete_response = SEMANTIC_SUPPRESSION_MESSAGE
 
+    # --- Policy Detection ---
+    policy_start = time.time()
+    policy_detected = False
+    policy_result = None
+    if user_input and not semantic_suppressed:
+        policy_result = detect_policy_document(user_input)
+        if policy_result.detection == PolicyDetection.POLICY:
+            policy_detected = True
+            logger.warning(
+                "[PolicyDetection] POLICY DETECTED: type=%s confidence=%.4f "
+                "policy_score=%.4f contractual_score=%.4f",
+                policy_result.policy_type, policy_result.confidence,
+                policy_result.policy_keyword_score, policy_result.contractual_signal_score,
+            )
+            issues = []
+            parse_failed = True
+            complete_response = POLICY_SUPPRESSION_MESSAGE.format(policy_type=policy_result.policy_type)
+        else:
+            logger.info(
+                "[PolicyDetection] No policy detected: detection=%s confidence=%.4f",
+                policy_result.detection.value, policy_result.confidence,
+            )
+    policy_ms = (time.time() - policy_start) * 1000
+
+    # --- Non-Legal Detection ---
+    non_legal_start = time.time()
+    non_legal_detected = False
+    non_legal_result = None
+    if user_input and not semantic_suppressed and not policy_detected:
+        non_legal_domain = compute_document_domain_confidence(user_input)
+        if non_legal_domain.domain == DocumentDomain.NON_LEGAL:
+            non_legal_detected = True
+            content_type, content_explanation, _ = classify_non_legal_content(user_input)
+            non_legal_result = {
+                "content_type": content_type,
+                "content_explanation": content_explanation,
+                "domain_confidence": non_legal_domain.confidence,
+                "legal_keyword_ratio": non_legal_domain.legal_keyword_ratio,
+                "structure_score": non_legal_domain.structure_score,
+            }
+            logger.warning(
+                "[NonLegalDetection] NON-LEGAL DETECTED: type=%s domain_confidence=%.4f "
+                "legal_keyword_ratio=%.4f structure_score=%.4f",
+                content_type, non_legal_domain.confidence,
+                non_legal_domain.legal_keyword_ratio, non_legal_domain.structure_score,
+            )
+            issues = []
+            parse_failed = True
+            complete_response = NON_LEGAL_SUPPRESSION_MESSAGE.format(content_type=content_type)
+        else:
+            logger.info(
+                "[NonLegalDetection] No non-legal suppression: domain=%s confidence=%.4f",
+                non_legal_domain.domain.value, non_legal_domain.confidence,
+            )
+    non_legal_ms = (time.time() - non_legal_start) * 1000
+
     # --- Domain Detection ---
     domain_start = time.time()
     domain_suppressed = False
-    if user_input and not semantic_suppressed:
+    if user_input and not semantic_suppressed and not policy_detected and not non_legal_detected:
         domain_result = compute_document_domain_confidence(user_input)
         domain_metadata = {
             "domain": domain_result.domain.value,
             "domain_confidence": round(domain_result.confidence, 4),
         }
-        if domain_result.domain == DocumentDomain.NON_LEGAL:
-            domain_suppressed = True
-            logger.warning(
-                "[DomainDetection] SUPPRESSION TRIGGERED: domain=NON_LEGAL "
-                "legal_keyword_ratio=%.4f structure_score=%.4f",
-                domain_result.legal_keyword_ratio, domain_result.structure_score,
+        # Skip domain suppression when structured parsing already failed.
+        # Parse failures often stem from LLM output quality issues rather than
+        # the document being non-legal. Cascading into domain suppression would
+        # lose the original response entirely, confusing users with a generic
+        # "not a legal contract" message when the document is valid but the LLM
+        # produced malformed output.
+        domain_is_non_legal = domain_result.domain == DocumentDomain.NON_LEGAL
+        if domain_is_non_legal:
+            if parse_failed:
+                logger.info(
+                    "[DomainDetection] SUPPRESSION SKIPPED — parse_failed=True "
+                    "domain=%s effective_score=%.4f "
+                    "legal_keyword_ratio=%.4f structure_score=%.4f "
+                    "legal_phrase_density=%.4f non_legal_penalty=%.4f",
+                    domain_result.domain.value, domain_result.confidence,
+                    domain_result.legal_keyword_ratio, domain_result.structure_score,
+                    domain_result.legal_phrase_density, domain_result.non_legal_penalty,
+                )
+            else:
+                domain_suppressed = True
+                logger.warning(
+                    "[DomainDetection] SUPPRESSION TRIGGERED: domain=NON_LEGAL "
+                    "legal_keyword_ratio=%.4f structure_score=%.4f "
+                    "legal_phrase_density=%.4f non_legal_penalty=%.4f "
+                    "effective_score=%.4f",
+                    domain_result.legal_keyword_ratio, domain_result.structure_score,
+                    domain_result.legal_phrase_density, domain_result.non_legal_penalty,
+                    domain_result.confidence,
+                )
+                issues = []
+                parse_failed = True
+                complete_response = DOMAIN_SUPPRESSION_MESSAGE
+        else:
+            logger.info(
+                "[DomainDetection] No suppression: domain=%s effective_score=%.4f "
+                "parse_failed=%s",
+                domain_result.domain.value, domain_result.confidence, parse_failed,
             )
-            issues = []
-            parse_failed = True
-            complete_response = DOMAIN_SUPPRESSION_MESSAGE
     else:
         domain_metadata = {}
     domain_ms = (time.time() - domain_start) * 1000
@@ -616,6 +717,8 @@ def build_audit_json_payload(
     logger.info("[Perf] parse_ms=%.0f", parse_ms)
     logger.info("[Perf] normalization_ms=%.0f", normalization_ms)
     logger.info("[Perf] quality_ms=%.0f", quality_ms)
+    logger.info("[Perf] policy_ms=%.0f", policy_ms)
+    logger.info("[Perf] non_legal_ms=%.0f", non_legal_ms)
     logger.info("[Perf] domain_ms=%.0f", domain_ms)
     logger.info("[Perf] confidence_ms=%.0f", confidence_ms)
     logger.info("[Perf] total_ms=%.0f", total_ms)
@@ -638,10 +741,50 @@ def build_audit_json_payload(
     if domain_metadata:
         metadata.update(domain_metadata)
 
+    if policy_result is not None:
+        policy_meta = {
+            "policy_detection": policy_result.detection.value,
+            "policy_type": policy_result.policy_type,
+            "policy_confidence": round(policy_result.confidence, 4),
+            "policy_explanation": policy_result.explanation,
+        }
+        if policy_result.matched_policy_keywords:
+            policy_meta["policy_keywords"] = policy_result.matched_policy_keywords
+        if policy_result.matched_contractual_signals:
+            policy_meta["contractual_signals"] = policy_result.matched_contractual_signals
+        metadata.update(policy_meta)
+
+    if non_legal_result is not None:
+        metadata["non_legal_detected"] = True
+        metadata["non_legal_type"] = non_legal_result["content_type"]
+        metadata["non_legal_explanation"] = non_legal_result["content_explanation"]
+        metadata["domain_confidence"] = round(non_legal_result["domain_confidence"], 4)
+        metadata["legal_keyword_ratio"] = round(non_legal_result["legal_keyword_ratio"], 4)
+
     if input_quality_degraded:
         metadata["input_quality"] = "LOW"
         metadata["input_quality_score"] = round(quality_result.score, 4)
         metadata["input_quality_warnings"] = quality_result.warnings
+
+    if policy_detected:
+        return build_policy_response(
+            model=model,
+            policy_type=policy_result.policy_type,
+            policy_explanation=policy_result.explanation,
+            policy_confidence=policy_result.confidence,
+            metadata=metadata,
+        )
+
+    if non_legal_detected:
+        return build_non_legal_response(
+            model=model,
+            content_type=non_legal_result["content_type"],
+            content_explanation=non_legal_result["content_explanation"],
+            domain_confidence=non_legal_result["domain_confidence"],
+            legal_keyword_ratio=non_legal_result["legal_keyword_ratio"],
+            structure_score=non_legal_result["structure_score"],
+            metadata=metadata,
+        )
 
     if parse_failed:
         return build_audit_response(

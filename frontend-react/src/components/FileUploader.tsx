@@ -148,7 +148,7 @@ export function FileUploader({
                 {isDragOver ? "Drop file here" : "Drag and drop your contract"}
               </p>
               <p className="text-sm text-slate-400">
-                or click to browse · PDF, TXT, DOC, DOCX up to 10MB
+                or click to browse · PDF up to 25MB, DOC/DOCX up to 15MB, TXT up to 2MB
               </p>
             </div>
           </div>

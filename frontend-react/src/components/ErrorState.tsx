@@ -9,7 +9,7 @@ type ErrorStateProps = {
   retryAttempt?: number;
 };
 
-export function ErrorState({ error, onReset }: ErrorStateProps) {
+export function ErrorState({ error, onReset, onRetry, isRetrying }: ErrorStateProps) {
   const getErrorInfo = (err: ApiError | string) => {
     if (typeof err === "string") {
       return {

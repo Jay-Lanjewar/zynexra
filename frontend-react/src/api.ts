@@ -118,6 +118,9 @@ export async function auditContractFile(
         if (lowerMessage.includes("encrypt") || lowerMessage.includes("password") || lowerMessage.includes("protected") || lowerMessage.includes("decrypt")) {
           throw { code: "ENCRYPTED_PDF", message: "This PDF appears to be encrypted, password protected, or unsupported." } as ApiError;
         }
+        if (lowerMessage.includes("too large") || lowerMessage.includes("exceed")) {
+          throw { code: "FILE_TOO_LARGE", message: backendMessage } as ApiError;
+        }
         throw { code: "VALIDATION_ERROR", message: backendMessage } as ApiError;
       }
 
@@ -249,20 +252,33 @@ export async function askAdvisoryQuestion(
 }
 
 export function validateFile(file: File): ApiError | null {
-  const MAX_SIZE_MB = 10;
   const allowedTypes = ["application/pdf", "text/plain", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
   const allowedExtensions = [".pdf", ".txt", ".doc", ".docx"];
 
-  if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-    return { code: "FILE_TOO_LARGE", message: `File exceeds maximum size of ${MAX_SIZE_MB}MB.` };
-  }
-
+  const name = file.name.toLowerCase();
   const hasAllowedType = allowedTypes.includes(file.type);
-  const hasAllowedExtension = allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+  const hasAllowedExtension = allowedExtensions.some(ext => name.endsWith(ext));
 
   if (!hasAllowedType && !hasAllowedExtension) {
     return { code: "INVALID_FILE_TYPE", message: "Only PDF, TXT, DOC, and DOCX files are supported." };
+  }
 
+  // Per-type size limits
+  let maxSizeMB: number;
+  let sizeLabel: string;
+  if (name.endsWith(".pdf")) {
+    maxSizeMB = 25;
+    sizeLabel = "25MB";
+  } else if (name.endsWith(".docx") || name.endsWith(".doc")) {
+    maxSizeMB = 15;
+    sizeLabel = "15MB";
+  } else {
+    maxSizeMB = 2;
+    sizeLabel = "2MB";
+  }
+
+  if (file.size > maxSizeMB * 1024 * 1024) {
+    return { code: "FILE_TOO_LARGE", message: `File exceeds maximum size of ${sizeLabel}.` };
   }
 
   return null;
