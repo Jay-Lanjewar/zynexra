@@ -1,0 +1,9 @@
+MUTUAL INDEMNIFICATION CLAUSE
+
+Section 10. Mutual Indemnification. Each party agrees to indemnify, defend, and hold harmless the other party, its affiliates, officers, directors, employees, and agents from and against any and all losses, damages, liabilities, claims, demands, judgments, settlements, costs, and expenses (including reasonable attorneys' fees) arising out of or relating to: (a) any breach of this Agreement by the indemnifying party; (b) any negligence or willful misconduct of the indemnifying party; and (c) any infringement of third-party intellectual property rights.
+
+The aggregate liability of each party under this Section 10 shall be capped at the total fees paid under this Agreement during the twelve (12) months preceding the claim. This liability cap applies to all claims under this Section 10.
+
+Notwithstanding the foregoing, neither party shall be liable to the other party for any consequential or indirect damages arising out of or relating to this Agreement, including but not limited to loss of profits, loss of business, or interruption of business.
+
+[END OF EXCERPT]

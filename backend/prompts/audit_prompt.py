@@ -77,10 +77,11 @@ If any two issues contain identical Quoted Text, you MUST merge them into a sing
 
 If a clause contains:
 - a clearly defined monetary liability cap,
-- mutual or balanced indemnity structure,
+- mutual or balanced indemnity structure (e.g., "each party" indemnifies the other),
 - and a defined survival period for confidentiality,
 it MUST NOT be flagged as HIGH or CRITICAL.
 Strong protective clauses are not risks unless they create imbalance, unenforceability, or regulatory conflict.
+If a clause contains mutual indemnification, an explicit liability cap, AND exclusion of indirect or consequential damages, it should be classified as LOW or MEDIUM severity at most. Such clauses reflect a balanced, commercially standard allocation of risk and may not warrant a finding at all unless additional problematic language is present.
 
 Before generating the Risk Explanation, explicitly determine:
 1. Which party bears the obligation?

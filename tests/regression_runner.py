@@ -239,6 +239,43 @@ def test_duplicate_clause_spam():
     }
 
 
+def test_balanced_mutual_indemnity():
+    filepath = TEST_DIR / "balanced_mutual_indemnity.txt"
+    data = send_file(filepath)
+
+    name = "balanced_mutual_indemnity"
+    passed = True
+    reasons = []
+
+    score = data.get("confidence_score", 0)
+    label = data.get("confidence_label", "N/A")
+    issue_count = data.get("issue_count", 0)
+    issues = data.get("issues", [])
+
+    # Balanced mutual indemnity must not appear as MEDIUM, HIGH, or CRITICAL
+    for issue in issues:
+        severity = issue.get("severity", "").upper()
+        category = issue.get("category", "")
+        if "indemn" in category.lower():
+            if severity in {"MEDIUM", "HIGH", "CRITICAL"}:
+                passed = False
+                reasons.append(f"balanced mutual indemnity has {severity} severity (expected LOW or suppressed)")
+
+    # If the finding was suppressed (no indemnity issue), that is acceptable behavior
+    # Issue count should still be reasonable (0 or very low)
+    if issue_count > 5:
+        passed = False
+        reasons.append(f"issue_count={issue_count} too high for clean balanced mutual indemnity")
+
+    return name, passed, reasons, {
+        "confidence_score": score,
+        "confidence_label": label,
+        "issue_count": issue_count,
+        "categories": [i.get("category", "") for i in issues],
+        "quality_warning": data.get("quality_warning", ""),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Runner helpers
 # ---------------------------------------------------------------------------
@@ -246,6 +283,7 @@ def test_duplicate_clause_spam():
 TEST_REGISTRY = [
     ("Clean NDA", test_clean_nda),
     ("Unlimited Indemnity", test_unlimited_indemnity),
+    ("Balanced Mutual Indemnity", test_balanced_mutual_indemnity),
     ("Garbage OCR", test_garbage_ocr),
     ("Empty File", test_empty_file),
     ("Contradictory Clauses", test_contradictory_clauses),

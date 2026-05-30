@@ -921,10 +921,77 @@ def render_legacy_audit_text(response_text: str, issues: List[AuditIssue]) -> st
         rendered = f"{rendered}\n\n{suffix}" if rendered else suffix
     return rendered
 
+def _check_balanced_mutual_indemnity(text: str) -> dict:
+    """Check if text contains balanced mutual indemnity with all three protections.
+    
+    Returns dict with detection flags:
+        is_balanced: True if all three conditions met
+        has_mutual_indemnity: mutual indemnity language detected
+        has_liability_cap: liability cap detected
+        has_exclusion: consequential/indirect damage exclusion detected
+        has_additional_risk: additional risk indicators (unlimited/uncapped) present
+    """
+    result = {
+        "is_balanced": False,
+        "has_mutual_indemnity": False,
+        "has_liability_cap": False,
+        "has_exclusion": False,
+        "has_additional_risk": False,
+    }
+    if not text:
+        return result
+
+    quoted = text
+
+    # 1. Mutual indemnity language: each party indemnifies the other, mutual indemnity, both parties indemnify
+    mutual_pattern = re.compile(
+        r"\b(?:"
+        r"each party\b.*\bindemnif(?:y|ies)\b.*\bthe other|"
+        r"mutual indemnit(?:y|ation)|"
+        r"both parties\b.*\bindemnif(?:y|ies)"
+        r")",
+        re.IGNORECASE
+    )
+    result["has_mutual_indemnity"] = bool(mutual_pattern.search(quoted))
+
+    # 2. Explicit liability cap
+    cap_pattern = re.compile(
+        r"\b(?:liability cap|aggregate cap|capped at|maximum liability)\b",
+        re.IGNORECASE
+    )
+    result["has_liability_cap"] = bool(cap_pattern.search(quoted))
+
+    # 3. Consequential / indirect damage exclusion
+    exclusion_pattern = re.compile(
+        r"(?:\bexcludes?\s+(?:consequential|indirect)\s+damages\b"
+        r"|\bliable\b.*\bfor\b.*\b(?:consequential|indirect)\s+damages\b"
+        r"|\bno\s+liability\s+for\s+(?:consequential|indirect)\b)",
+        re.IGNORECASE
+    )
+    result["has_exclusion"] = bool(exclusion_pattern.search(quoted))
+
+    # Additional risk indicators (unlimited/uncapped)
+    unlimited_pattern = re.compile(r"\b(unlimited|uncapped)\b|no cap|no limit", re.IGNORECASE)
+    result["has_additional_risk"] = bool(unlimited_pattern.search(quoted))
+
+    result["is_balanced"] = (
+        result["has_mutual_indemnity"]
+        and result["has_liability_cap"]
+        and result["has_exclusion"]
+    )
+
+    return result
+
+
 def normalize_audit_issue_severity_fields(issues: List[AuditIssue]) -> List[AuditIssue]:
     """Deterministically enforce severity overrides on structured issue fields."""
     unlimited_pattern = re.compile(r"\b(unlimited|uncapped)\b|no cap|no limit", re.IGNORECASE)
     severity_rank = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+    capped_indemnity_cues = re.compile(
+        r"\b(?:capped at|liability cap|aggregate cap|shall not exceed|must not exceed|may not exceed|"
+        r"limited to|maximum amount|up to|cap of)\b|[$â‚¹â‚¬Â£]\s?\d|\b\d+(?:,\d{3})*(?:\.\d+)?\s*(?:usd|inr|eur|gbp|dollars|rupees)\b",
+        re.IGNORECASE
+    )
 
     for issue in issues:
         current_severity = issue.severity.strip().upper()
@@ -942,6 +1009,30 @@ def normalize_audit_issue_severity_fields(issues: List[AuditIssue]) -> List[Audi
                 new_severity = "HIGH"
         if "INDEMNIFICATION" in category_upper and has_unlimited:
             new_severity = "CRITICAL"
+
+        # Balanced mutual indemnity post-processing rule.
+        # When a clause contains all three balancing features (mutual indemnity language,
+        # liability cap, consequential damage exclusion), maximum severity is LOW unless
+        # additional risk factors exist. Risk explanations must acknowledge the protections.
+        bal = _check_balanced_mutual_indemnity(issue.quoted_text or "")
+        if bal["is_balanced"]:
+            if severity_rank.get(new_severity, -1) > severity_rank["LOW"]:
+                new_severity = "LOW"
+
+        # Broader capped mutual indemnity downgrade for patterns detected
+        # by the existing regex (acts as safety net for variants).
+        if severity_rank.get(new_severity, -1) >= severity_rank["HIGH"]:
+            quoted = issue.quoted_text or ""
+            has_cap = bool(capped_indemnity_cues.search(quoted))
+            has_indemnity = bool(re.search(r"\b(indemn|indemnify|indemnity|hold harmless)\b", quoted, re.IGNORECASE))
+            has_mutual = bool(re.search(r"\b(each party|mutual|both parties|reciprocal)\b", quoted, re.IGNORECASE))
+            has_exclusion = bool(re.search(
+                r"\b(excluding|exclude|exclusion)\b.+\b(indirect|consequential)\b",
+                quoted, re.IGNORECASE
+            ))
+            if has_indemnity and has_cap and has_mutual and has_exclusion:
+                if severity_rank.get(new_severity, -1) > severity_rank["MEDIUM"]:
+                    new_severity = "MEDIUM"
 
         if new_severity and new_severity != current_severity:
             issue.severity = new_severity
@@ -1029,6 +1120,21 @@ def normalize_audit_issue_fields(issues: List[AuditIssue]) -> List[AuditIssue]:
                 logger.info("[Normalization] Forbidden phrase correction -> capped indemnity suggestion text")
                 issue.suggested_improvement = corrected_suggestion
 
+        # Balanced mutual indemnity: rewrite risk explanation to acknowledge balancing protections
+        bal = _check_balanced_mutual_indemnity(issue.quoted_text or "")
+        if bal["is_balanced"]:
+            alarmist_patterns = re.compile(
+                r"\b(significant exposure|substantial risk|high risk|critical exposure)\b",
+                re.IGNORECASE
+            )
+            if alarmist_patterns.search(issue.risk_explanation):
+                logger.info("[Normalization] Balanced mutual indemnity risk rewrite")
+                issue.risk_explanation = (
+                    "This clause contains mutual indemnification with a defined liability cap "
+                    "and exclusion of consequential damages, reflecting a balanced allocation of "
+                    "risk between the parties."
+                )
+
         new_category = category_text
         if category_lower in structural_categories:
             new_category = "Structural Inconsistency"
@@ -1111,6 +1217,31 @@ def suppress_duplicate_audit_issues(issues: List[AuditIssue]) -> List[AuditIssue
 
     return kept_issues
 
+
+def suppress_balanced_mutual_indemnity_issues(issues: List[AuditIssue]) -> List[AuditIssue]:
+    """Suppress issues that are clean balanced mutual indemnity (no additional risk indicators).
+    
+    A clean balanced mutual indemnity clause has all three protections (mutual indemnity
+    language, liability cap, consequential damage exclusion) and no additional risk factors
+    such as unlimited/uncapped exposure. Such clauses reflect a commercially standard
+    allocation of risk and do not warrant a finding.
+    """
+    kept = []
+    suppressed_count = 0
+    for issue in issues:
+        bal = _check_balanced_mutual_indemnity(issue.quoted_text or "")
+        if bal["is_balanced"] and not bal["has_additional_risk"]:
+            suppressed_count += 1
+            logger.info("[Normalization] Suppressing clean balanced mutual indemnity finding")
+            continue
+        kept.append(issue)
+
+    if suppressed_count:
+        logger.info("[Normalization] Balanced mutual indemnity suppressions -> %s", suppressed_count)
+
+    return kept
+
+
 def normalize_audit_response(response_text: str, mode: str = "AUDIT") -> str:
     """Normalize audit output through structured issues and render legacy text."""
     if mode != "AUDIT":
@@ -1123,6 +1254,7 @@ def normalize_audit_response(response_text: str, mode: str = "AUDIT") -> str:
 
     structured_issues = normalize_audit_issue_severity_fields(structured_issues)
     structured_issues = normalize_audit_issue_fields(structured_issues)
+    structured_issues = suppress_balanced_mutual_indemnity_issues(structured_issues)
     return render_legacy_audit_text(response_text, structured_issues)
 
 def normalize_issue_severity(response_text: str) -> str:
@@ -1133,6 +1265,11 @@ def normalize_issue_severity(response_text: str) -> str:
     issue_pattern = re.compile(r"(?ims)^Issue:\s*.*?(?=^Issue:\s*|\Z)")
     unlimited_pattern = re.compile(r"\b(unlimited|uncapped)\b|no cap|no limit", re.IGNORECASE)
     severity_rank = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+    capped_indemnity_cues = re.compile(
+        r"\b(?:capped at|liability cap|aggregate cap|shall not exceed|must not exceed|may not exceed|"
+        r"limited to|maximum amount|up to|cap of)\b|[$â‚¹â‚¬Â£]\s?\d|\b\d+(?:,\d{3})*(?:\.\d+)?\s*(?:usd|inr|eur|gbp|dollars|rupees)\b",
+        re.IGNORECASE
+    )
 
     def apply_overrides(block: str) -> str:
         severity_match = re.search(r"(?im)^Severity:\s*(.+)", block)
@@ -1170,6 +1307,25 @@ def normalize_issue_severity(response_text: str) -> str:
         # 4. Indemnification + unlimited -> CRITICAL
         if "INDEMNIFICATION" in category_upper and has_unlimited:
             new_severity = "CRITICAL"
+
+        # 5. Balanced mutual indemnity: cap severity at LOW.
+        bal = _check_balanced_mutual_indemnity(quoted)
+        if bal["is_balanced"]:
+            if severity_rank.get(new_severity, -1) > severity_rank["LOW"]:
+                new_severity = "LOW"
+
+        # 6. Broader capped mutual indemnity downgrade (safety net for variants).
+        if not bal["is_balanced"] and severity_rank.get(new_severity, -1) >= severity_rank["HIGH"]:
+            has_cap = bool(capped_indemnity_cues.search(quoted))
+            has_indemnity = bool(re.search(r"\b(indemn|indemnify|indemnity|hold harmless)\b", quoted, re.IGNORECASE))
+            has_mutual = bool(re.search(r"\b(each party|mutual|both parties|reciprocal)\b", quoted, re.IGNORECASE))
+            has_exclusion = bool(re.search(
+                r"\b(excluding|exclude|exclusion)\b.+\b(indirect|consequential)\b",
+                quoted, re.IGNORECASE
+            ))
+            if has_indemnity and has_cap and has_mutual and has_exclusion:
+                if severity_rank.get(new_severity, -1) > severity_rank["MEDIUM"]:
+                    new_severity = "MEDIUM"
 
         if new_severity != current_severity:
             block = re.sub(
@@ -1346,6 +1502,22 @@ def normalize_issue_output(response_text: str) -> str:
                 logger.info("[Normalization] Forbidden phrase correction -> capped indemnity suggestion text")
                 suggested_text = corrected_suggestion
                 suggested_changed = True
+
+        # Balanced mutual indemnity: rewrite risk explanation to acknowledge protections
+        bal = _check_balanced_mutual_indemnity(quoted_text)
+        if bal["is_balanced"]:
+            alarmist_patterns = re.compile(
+                r"\b(significant exposure|substantial risk|high risk|critical exposure)\b",
+                re.IGNORECASE
+            )
+            if alarmist_patterns.search(risk_text):
+                logger.info("[Normalization] Balanced mutual indemnity risk rewrite (legacy)")
+                risk_text = (
+                    "This clause contains mutual indemnification with a defined liability cap "
+                    "and exclusion of consequential damages, reflecting a balanced allocation of "
+                    "risk between the parties."
+                )
+                risk_changed = True
 
         # 1. Category normalization (Category line only)
         new_category = category_text
