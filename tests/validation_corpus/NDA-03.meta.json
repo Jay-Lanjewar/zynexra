@@ -1,0 +1,15 @@
+{
+  "document_id": "NDA-03",
+  "title": "Mutual Non-Disclosure Agreement with Embedded Non-Solicitation",
+  "source": {
+    "type": "synthetic_from_template",
+    "description": "Mutual NDA that includes a non-solicitation clause restricting employee hiring, unusual for a standalone NDA"
+  },
+  "type": "NDA",
+  "subtype": "mutual",
+  "risk_level": "moderate",
+  "clause_set": ["confidentiality", "exclusions", "term", "survival", "non-solicit", "return", "no-license", "remedy", "governing-law"],
+  "red_flag": false,
+  "word_count": 310,
+  "jurisdiction": "California"
+}

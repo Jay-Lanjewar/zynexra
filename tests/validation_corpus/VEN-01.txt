@@ -1,0 +1,23 @@
+SOFTWARE AS A SERVICE AGREEMENT
+
+This Software as a Service Agreement (the "Agreement") is entered into as of [Date] by and between [Provider], a [Jurisdiction] corporation ("Provider"), and [Customer], a [Jurisdiction] corporation ("Customer").
+
+1. SUBSCRIPTION. Provider grants Customer a non-exclusive, non-transferable right to access and use the [Product] software platform (the "Service") during the Subscription Term, solely for Customer's internal business purposes.
+
+2. FEES AND PAYMENT. Customer shall pay the subscription fees as set forth in the applicable Order Form. Fees are due within thirty (30) days of invoice. Late payments shall bear interest at [Rate] per month.
+
+3. SERVICE LEVEL AGREEMENT. Provider shall maintain the Service with an uptime of at least 99.9% availability, measured monthly. If Provider fails to meet this SLA, Customer shall be entitled to service credits as set forth in the Service Level Agreement attached as Exhibit A.
+
+4. DATA PROCESSING. Provider shall process Customer's data in accordance with the Data Processing Agreement attached as Exhibit B, which includes Standard Contractual Clauses for international data transfers.
+
+5. CONFIDENTIALITY. Each party shall hold the other party's confidential information in confidence and shall not disclose it to third parties without the other party's consent.
+
+6. LIMITATION OF LIABILITY. Neither party's aggregate liability arising out of or relating to this Agreement shall exceed the total fees paid by Customer to Provider during the twelve (12) months preceding the claim. Neither party shall be liable for any indirect, incidental, special, consequential, or punitive damages.
+
+7. INDEMNIFICATION. Each party agrees to indemnify, defend, and hold harmless the other party from and against any claims arising out of the indemnifying party's breach of this Agreement or infringement of third-party intellectual property rights. Each party's indemnification obligations shall be subject to the limitation of liability set forth in Section 6.
+
+8. TERM AND TERMINATION. The initial term shall be twelve (12) months, automatically renewing for successive twelve (12) month periods unless either party provides thirty (30) days' written notice of non-renewal. Either party may terminate for material breach that remains uncured for thirty (30) days after written notice.
+
+9. GOVERNING LAW. This Agreement shall be governed by the laws of the State of New York.
+
+10. ENTIRE AGREEMENT. This Agreement, together with the exhibits and Order Forms referenced herein, constitutes the entire agreement between the parties.

@@ -1,0 +1,21 @@
+NON-DISCLOSURE AGREEMENT
+
+This Non-Disclosure Agreement (the "Agreement") is entered into as of [Date] by and between [Company], a [Jurisdiction] corporation ("Company"), and [Recipient], a [Jurisdiction] entity ("Recipient").
+
+1. CONFIDENTIAL INFORMATION. "Confidential Information" means all information, materials, and know-how disclosed by Company to Recipient, whether in written, oral, visual, electronic, or other form. Confidential Information includes without limitation: business plans, financial data, customer lists, technical data, product specifications, trade secrets, inventions, patent applications, research and development information, marketing plans, and any other information that Company designates as confidential.
+
+2. OBLIGATIONS. Recipient agrees to: (a) hold Confidential Information in confidence; (b) not disclose Confidential Information to any person or entity other than Recipient's employees who have a need to know; (c) use Confidential Information solely for the purpose of evaluating a proposed transaction with Company; and (d) protect Confidential Information using at least the same degree of care Recipient uses for its own confidential information of a similar nature.
+
+3. EXCLUSIONS. Notwithstanding the foregoing, the obligations set forth in this Agreement shall not apply to any information that Recipient can demonstrate by written documentation: (a) is or becomes publicly available through no fault of Recipient; (b) was in Recipient's lawful possession prior to disclosure.
+
+4. TERM. This Agreement shall commence on the Effective Date and continue for a period of one (1) year. The confidentiality obligations shall survive termination of this Agreement for a period of five (5) years.
+
+5. RETURN OF MATERIALS. Upon Company's request, Recipient shall return or destroy all Confidential Information and any copies thereof.
+
+6. NO LICENSE. Nothing in this Agreement grants to Recipient any right or license under any intellectual property rights of Company.
+
+7. REMEDIES. Recipient acknowledges that any breach of this Agreement would cause irreparable harm to Company. Company shall be entitled to seek injunctive relief without the requirement of posting a bond or proving actual damages.
+
+8. GOVERNING LAW. This Agreement shall be governed by the laws of the State of New York.
+
+9. ASSIGNMENT. Recipient may not assign this Agreement or any of its rights or obligations hereunder without the prior written consent of Company. Any attempted assignment in violation of this Section shall be void.

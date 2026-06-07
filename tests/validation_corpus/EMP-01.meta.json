@@ -1,0 +1,15 @@
+{
+  "document_id": "EMP-01",
+  "title": "Standard At-Will Employment Agreement",
+  "source": {
+    "type": "synthetic_from_template",
+    "description": "Standard California-style employment agreement with reasonable invention assignment carveout, 6-month non-compete, and 12-month non-solicit"
+  },
+  "type": "EMPLOYMENT",
+  "subtype": "at-will",
+  "risk_level": "clean",
+  "clause_set": ["at-will", "compensation", "benefits", "confidentiality", "invention-assignment", "non-compete", "non-solicit", "governing-law"],
+  "red_flag": false,
+  "word_count": 310,
+  "jurisdiction": "California"
+}

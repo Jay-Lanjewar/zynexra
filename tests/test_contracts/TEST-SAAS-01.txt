@@ -1,0 +1,35 @@
+SaaS SUBSCRIPTION AGREEMENT
+
+This SaaS Subscription Agreement ("Agreement") is entered into as of January 15, 2025 ("Effective Date") by and between CloudTech Inc., a Delaware corporation ("Provider"), and Global Manufacturing Ltd., a Texas corporation ("Customer").
+
+1. SUBSCRIPTION SERVICES
+Provider shall provide Customer access to the CloudTech Platform, a cloud-based project management software-as-a-service solution, as described in Exhibit A.
+
+2. TERM
+This Agreement shall commence on the Effective Date and continue for twelve (12) months. Automatically renews for successive twelve-month periods unless either party provides written notice of non-renewal at least thirty (30) days prior to the end of the then-current term.
+
+3. FEES
+Customer shall pay Provider the subscription fees set forth in Exhibit B. All fees are non-refundable. Late payments accrue interest at 1.5% per month.
+
+4. DATA OWNERSHIP
+Customer retains all rights, title, and interest in and to Customer Data. Provider shall not access, use, or disclose Customer Data except as necessary to perform the Services.
+
+5. DATA SECURITY
+Provider shall implement and maintain commercially reasonable administrative, physical, and technical safeguards to protect Customer Data from unauthorized access, use, or disclosure. Provider shall notify Customer within seventy-two (72) hours of discovering any security breach affecting Customer Data.
+
+6. SERVICE LEVELS
+Provider shall use commercially reasonable efforts to make the Services available at least 99.5% of the time in any calendar month, measured on a 24x7 basis, excluding scheduled maintenance windows.
+
+7. LIMITATION OF LIABILITY
+IN NO EVENT SHALL EITHER PARTY BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, REGARDLESS OF THE CAUSE OF ACTION OR THEORY OF LIABILITY, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+8. INDEMNIFICATION
+Customer shall indemnify, defend, and hold harmless Provider from and against any third-party claims arising from Customer's use of the Services in violation of this Agreement.
+
+9. TERMINATION FOR CONVENIENCE
+Either party may terminate this Agreement for any reason upon ninety (90) days' written notice to the other party. Upon termination, Provider shall delete all Customer Data within thirty (30) days.
+
+10. GOVERNING LAW
+This Agreement shall be governed by the laws of the State of Delaware, without regard to its conflict of laws principles.
+
+IN WITNESS WHEREOF, the parties have executed this Agreement as of the date first written above.

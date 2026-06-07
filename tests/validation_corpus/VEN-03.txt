@@ -1,0 +1,23 @@
+PROFESSIONAL SERVICES AGREEMENT
+
+This Professional Services Agreement (the "Agreement") is entered into as of [Date] by and between [Consultant], a [Jurisdiction] entity ("Consultant"), and [Client], a [Jurisdiction] corporation ("Client").
+
+1. SERVICES. Consultant shall provide the professional services described in each applicable Statement of Work ("SOW") executed by the parties.
+
+2. FEES AND EXPENSES. Client shall pay Consultant the fees set forth in each SOW. Consultant shall invoice monthly, and Client shall pay within thirty (30) days of invoice. Client shall reimburse Consultant for reasonable travel and out-of-pocket expenses.
+
+3. INTELLECTUAL PROPERTY OWNERSHIP. Consultant retains all right, title, and interest in and to any and all intellectual property, including without limitation software, code, algorithms, methodologies, know-how, tools, templates, and deliverables that Consultant creates or develops in connection with the Services (the "Deliverables"). Consultant grants Client a non-exclusive, perpetual, irrevocable, worldwide, royalty-free license to use the Deliverables for Client's internal business purposes. Consultant may use, reuse, and modify any general-purpose tools, methodologies, and know-how developed during the Services for any purpose.
+
+4. CONFIDENTIALITY. Each party shall hold the other's confidential information in confidence for a period of five (5) years.
+
+5. NON-COMPETITION. For a period of two (2) years following the completion of all services under this Agreement, Client shall not hire, engage, or otherwise retain any employee or former employee of Consultant who was involved in providing the Services.
+
+6. LIMITATION OF LIABILITY. Consultant's aggregate liability arising out of or relating to this Agreement shall not exceed the total fees paid by Client under the applicable SOW. In no event shall Consultant be liable for any indirect, incidental, special, consequential, or punitive damages.
+
+7. NO INDEMNIFICATION. Neither party shall have any obligation to indemnify the other party.
+
+8. TERM AND TERMINATION. This Agreement shall commence on the Effective Date and continue until terminated. Either party may terminate this Agreement for convenience upon thirty (30) days' written notice. Either party may terminate for material breach that remains uncured for thirty (30) days.
+
+9. GOVERNING LAW. This Agreement shall be governed by the laws of the State of Texas.
+
+10. ENTIRE AGREEMENT. This Agreement, together with each SOW, constitutes the entire agreement.

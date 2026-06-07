@@ -1,0 +1,21 @@
+CONFIDENTIALITY AND NON-DISCLOSURE AGREEMENT
+
+This Confidentiality and Non-Disclosure Agreement (the "Agreement") is made as of [Date] by and between [Disclosing Party], a [Jurisdiction] corporation ("Disclosing Party"), and [Receiving Party], a [Jurisdiction] corporation ("Receiving Party").
+
+1. DEFINITION OF CONFIDENTIAL INFORMATION. "Confidential Information" means any non-public information disclosed by Disclosing Party to Receiving Party, whether orally, in writing, or in any other form, that is either designated as confidential at the time of disclosure or that a reasonable person would understand to be confidential given the nature of the information and the circumstances of disclosure.
+
+2. OBLIGATIONS OF RECEIVING PARTY. Receiving Party shall: (a) hold Confidential Information in strict confidence using no less than a reasonable degree of care; (b) not disclose Confidential Information to any third party without Disclosing Party's prior written consent, except as expressly permitted herein; (c) use Confidential Information solely for the purpose of evaluating a potential business relationship between the parties (the "Purpose"); and (d) limit access to Confidential Information to those employees and advisors who have a need to know and who are bound by confidentiality obligations at least as protective as those set forth herein.
+
+3. EXCLUSIONS. Confidential Information does not include information that: (a) is or becomes publicly known through no breach of this Agreement; (b) was rightfully in Receiving Party's possession prior to disclosure; (c) is independently developed by Receiving Party without use of or reference to Confidential Information; or (d) is rightfully obtained by Receiving Party from a third party without restriction on disclosure.
+
+4. TERM AND SURVIVAL. This Agreement shall commence on the Effective Date and continue for a period of two (2) years. The confidentiality obligations set forth herein shall survive termination or expiration of this Agreement and continue for a period of three (3) years thereafter.
+
+5. RETURN OF MATERIALS. Upon Disclosing Party's written request, Receiving Party shall promptly return or destroy all tangible Confidential Information and certify in writing that such return or destruction has been completed.
+
+6. NO LICENSE. Nothing in this Agreement grants Receiving Party any patent, copyright, trademark, trade secret, or other intellectual property license or right.
+
+7. REMEDIES. Receiving Party acknowledges that monetary damages would be an inadequate remedy for breach of this Agreement and that Disclosing Party shall be entitled to seek injunctive relief without the necessity of posting bond.
+
+8. GOVERNING LAW. This Agreement shall be governed by and construed in accordance with the laws of the State of Delaware, without regard to its conflict of laws principles.
+
+9. ENTIRE AGREEMENT. This Agreement constitutes the entire agreement between the parties with respect to the subject matter hereof and supersedes all prior and contemporaneous agreements and understandings, whether written or oral.

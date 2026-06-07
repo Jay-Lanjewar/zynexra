@@ -5,6 +5,18 @@ import re
 from backend.logger import logger
 
 
+SELF_NEGATING_PATTERNS = [
+    re.compile(r"(?i)does\s+not\s+create\s+(significant\s+)?risk"),
+    re.compile(r"(?i)does\s+not\s+appear\s+(to\s+)?(create\s+)?(significant\s+)?(risk|problematic)"),
+    re.compile(r"(?i)(is|appears?\s+to\s+be)\s+standard\s+and\s+(does\s+not|is\s+not)"),
+    re.compile(r"(?i)commercially\s+reasonable"),
+    re.compile(r"(?i)balanced\s+and\s+commercially\s+reasonable"),
+    re.compile(r"(?i)no\s+suggested\s+improvement\s+needed"),
+    re.compile(r"(?i)does\s+not\s+warrant\s+a\s+finding"),
+    re.compile(r"(?i)not\s+a\s+risk"),
+    re.compile(r"(?i)no\s+significant\s+risk"),
+]
+
 SURVIVAL_PHRASES = [
     re.compile(r"(?i)\bsurvive\s+(?:the\s+)?termination\b"),
     re.compile(r"(?i)\bcontinues?\s+(?:to\s+)?(?:be\s+)?(?:in\s+)?effect\s+(?:after\s+)?(?:the\s+)?termination\b"),
@@ -192,6 +204,24 @@ def _find_document_level_conflicts(issues: list) -> Set[int]:
     return conflict_indices
 
 
+def _is_self_negating(issue) -> tuple:
+    """Check if model reports an issue but its own risk_explanation says it's not risky.
+
+    Returns (True, matched_phrase) if a self-negating pattern is found,
+    (False, "") otherwise.
+    """
+    risk = (issue.risk_explanation or "").lower()
+    sev = (issue.severity or "").upper()
+    base_sev = sev.split("/")[0].strip()
+    if base_sev not in ("LOW", "MEDIUM"):
+        return False, ""
+    for pattern in SELF_NEGATING_PATTERNS:
+        match = pattern.search(risk)
+        if match:
+            return True, match.group(0)
+    return False, ""
+
+
 def validate_contradictions(issues: list, document_text: str = "") -> List[ContradictionResult]:
     results: List[ContradictionResult] = []
 
@@ -265,6 +295,32 @@ def validate_contradictions(issues: list, document_text: str = "") -> List[Contr
             logger.warning(
                 "[ContradictionSuppression] suppressed_reason=semantic_mismatch issue=%d",
                 idx
+            )
+            continue
+
+        is_self_neg, matched_phrase = _is_self_negating(issue)
+        if is_self_neg:
+            if is_document_level:
+                logger.info(
+                    "[SelfNegatingSuppression] document_level_conflict=True issue=%d "
+                    "issue_title='%s' category='%s' severity='%s' matched_phrase='%s' - NOT suppressing",
+                    idx, issue.issue_title, category, issue.severity, matched_phrase
+                )
+                continue
+
+            result = ContradictionResult(
+                has_contradiction=True,
+                issue_index=idx,
+                contradiction_type="self_negating",
+                quoted_text=quoted,
+                category=category,
+                risk_explanation=risk,
+                reason=f"Model flags issue but its own risk_explanation states the clause is not risky (self-negating finding).",
+            )
+            results.append(result)
+            logger.warning(
+                "[SelfNegatingSuppression] issue_title='%s' category='%s' severity='%s' matched_phrase='%s'",
+                issue.issue_title, category, issue.severity, matched_phrase
             )
 
     return results

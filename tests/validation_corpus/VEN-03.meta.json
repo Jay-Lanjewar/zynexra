@@ -1,0 +1,15 @@
+{
+  "document_id": "VEN-03",
+  "title": "Professional Services Agreement with Consultant-Owned IP and Client Non-Solicit",
+  "source": {
+    "type": "synthetic_from_template",
+    "description": "Professional services agreement where consultant retains all IP and grants client only a non-exclusive license, plus a 2-year client non-solicit of consultant's employees"
+  },
+  "type": "VENDOR_SERVICE",
+  "subtype": "professional-services",
+  "risk_level": "high-risk",
+  "clause_set": ["services", "fees", "ip-ownership-vendor", "confidentiality", "non-solicit-of-consultant", "liability-cap", "exclusion-of-consequential", "no-indemnity", "term", "governing-law", "entire-agreement"],
+  "red_flag": true,
+  "word_count": 300,
+  "jurisdiction": "Texas"
+}

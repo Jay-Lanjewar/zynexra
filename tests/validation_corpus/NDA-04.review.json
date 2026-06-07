@@ -1,0 +1,36 @@
+{
+  "document_id": "NDA-04",
+  "title": "Confidentiality Agreement with Auto-Renewal and Perpetual Survival",
+  "model_under_test": "qwen2.5:3b-instruct",
+  "ground_truth": {
+    "parse_should_succeed": true,
+    "expected_issue_count": 1,
+    "max_allowed_issues": 2,
+    "expected_confidence_label": "HIGH",
+    "min_confidence_score": 0.65,
+    "issues": [
+      {
+        "id": "NDA-04-A",
+        "expected_issue_title": "Perpetual Confidentiality Survival",
+        "expected_severity": "MEDIUM",
+        "allowed_severities": ["MEDIUM", "HIGH"],
+        "expected_category": "Enforceability Weakness",
+        "allowed_categories": ["Enforceability Weakness", "Negotiation Imbalance", "Confidentiality Risk"],
+        "must_contain_quoted_text_pattern": ["perpetually", "indefinitely", "survive", "perpetual"],
+        "must_not_contain_quoted_text_pattern": [],
+        "must_contain_explanation_pattern": ["perpetual", "indefinite", "survival", "confidentiality"],
+        "must_not_contain_explanation_pattern": [],
+        "rationale": "Perpetual confidentiality survival creates an indefinite obligation that may be unenforceable in many jurisdictions. Combined with auto-renewal (90-day notice buried), this creates a permanent confidentiality obligation. The prompt's CRITICAL rule for 'confidentiality terminates completely' does not apply, but perpetual survival is still a MEDIUM-HIGH enforceability risk."
+      }
+    ],
+    "rationale": "Two issues combined: (1) confidentiality survives perpetually (indefinite), and (2) auto-renewal with 90-day notice period buries the termination mechanism. The perpetual survival is the primary risk. CRITICAL severity would apply if confidentiality 'terminates completely' — here it survives perpetually, which is different."
+  },
+  "evaluation_weights": {
+    "parse_success": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "severity_accuracy": 1.0,
+    "false_positive_penalty": 1.0,
+    "false_negative_penalty": 2.0
+  }
+}

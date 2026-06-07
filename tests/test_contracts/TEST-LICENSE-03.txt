@@ -1,0 +1,32 @@
+SOFTWARE LICENSING AGREEMENT
+
+This Software Licensing Agreement ("Agreement") is entered into as of April 10, 2025, by and between DataVault Systems Inc., a Massachusetts corporation ("Licensor"), and Midwest Healthcare Network LLC, an Illinois limited liability company ("Licensee").
+
+1. LICENSE GRANT
+Licensor grants Licensee a non-exclusive, non-transferable, perpetual license to use the DataVault software (the "Software") as described in Exhibit A, solely for Licensee's internal business purposes.
+
+2. RESTRICTIONS
+Licensee shall not: (a) reverse engineer, decompile, or disassemble the Software; (b) distribute, sublicense, or transfer the Software to any third party; (c) modify or create derivative works of the Software; (d) remove or alter any proprietary notices on the Software.
+
+3. LICENSE FEE
+Licensee shall pay Licensor a one-time license fee of $150,000 USD, due within thirty (30) days of execution of this Agreement.
+
+4. SUPPORT AND MAINTENANCE
+Licensor shall provide email and telephone support during business hours for the first twelve (12) months following execution. After the initial support period, Licensee may purchase annual support and maintenance for 20% of the original license fee per year.
+
+5. LIMITED WARRANTY
+Licensor warrants that the Software will perform substantially in accordance with its documentation for a period of ninety (90) days from delivery. LICENSOR DISCLAIMS ALL OTHER WARRANTIES, INCLUDING WITHOUT LIMITATION THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+6. INDEMNIFICATION
+Licensor shall defend, indemnify, and hold harmless Licensee from any third-party claim that the Software infringes any United States patent, copyright, or trade secret, provided that Licensee promptly notifies Licensor of the claim and cooperates in the defense.
+
+7. LIMITATION OF LIABILITY
+IN NO EVENT SHALL LICENSOR'S LIABILITY EXCEED THE AMOUNT OF THE LICENSE FEE PAID UNDER THIS AGREEMENT. IN NO EVENT SHALL LICENSOR BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES.
+
+8. TERMINATION
+This Agreement is perpetual and shall remain in effect until terminated. Either party may terminate this Agreement upon material breach if the breach is not cured within thirty (30) days of written notice. Upon termination, Licensee must cease all use of the Software and destroy all copies.
+
+9. GOVERNING LAW
+This Agreement shall be governed by the laws of the Commonwealth of Massachusetts.
+
+AGREED AND ACCEPTED:

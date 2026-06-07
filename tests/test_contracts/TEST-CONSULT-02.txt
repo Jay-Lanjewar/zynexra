@@ -1,0 +1,38 @@
+MASTER SERVICES AGREEMENT
+
+This Master Services Agreement ("Agreement") is made effective as of March 1, 2025, between TechConsulting Partners LLC, a California limited liability company ("Consultant"), and Stellar Retail Corp., a New York corporation ("Client").
+
+1. SERVICES
+Consultant shall provide Client with IT consulting, system integration, and digital transformation services as described in individual Statements of Work ("SOW") executed under this Agreement.
+
+2. TERM
+This Agreement shall remain in effect for twenty-four (24) months from the Effective Date. SOWs may extend beyond the term of this Agreement.
+
+3. COMPENSATION
+Client shall pay Consultant at the rates set forth in each SOW. All invoices are due and payable within thirty (30) days of the invoice date. Late payments shall bear interest at the rate of 1.5% per month.
+
+4. INDEPENDENT CONTRACTOR
+Consultant is an independent contractor and nothing in this Agreement shall be construed to create a partnership, joint venture, or employment relationship.
+
+5. INTELLECTUAL PROPERTY
+All deliverables created by Consultant under this Agreement shall be considered "work made for hire" and shall be the exclusive property of Client. To the extent any deliverable does not qualify as a work made for hire, Consultant hereby irrevocably assigns to Client all right, title, and interest in and to such deliverables.
+
+6. CONFIDENTIALITY
+Each party agrees to hold in confidence all non-public information disclosed by the other party. The obligations of confidentiality shall survive termination of this Agreement for a period of three (3) years.
+
+7. NON-COMPETE
+During the term of this Agreement and for a period of twelve (12) months following termination, Consultant shall not provide substantially similar services to any direct competitor of Client within the State of California.
+
+8. LIMITATION OF LIABILITY
+CONSULTANT'S TOTAL AGGREGATE LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED THE TOTAL FEES PAID BY CLIENT UNDER THIS AGREEMENT DURING THE TWELVE (12) MONTHS PRECEDING THE CLAIM.
+
+9. TERMINATION
+Either party may terminate this Agreement for cause upon thirty (30) days' written notice if the other party materially breaches this Agreement and fails to cure within such period. Client may terminate for convenience upon sixty (60) days' written notice.
+
+10. WARRANTY
+Consultant warrants that the Services will be performed in a professional and workmanlike manner, consistent with industry standards.
+
+11. GOVERNING LAW
+This Agreement shall be governed by the laws of the State of California.
+
+ACCEPTED AND AGREED:

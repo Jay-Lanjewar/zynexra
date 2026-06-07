@@ -1,0 +1,15 @@
+{
+  "document_id": "VEN-01",
+  "title": "Enterprise SaaS Agreement with Full Protections",
+  "source": {
+    "type": "synthetic_from_template",
+    "description": "Enterprise-grade SaaS agreement with 99.9% SLA, DPA with SCCs, capped mutual indemnity, bilateral limitation of liability"
+  },
+  "type": "VENDOR_SERVICE",
+  "subtype": "SaaS",
+  "risk_level": "clean",
+  "clause_set": ["subscription", "fees", "sla", "data-processing", "confidentiality", "liability-cap", "exclusion-of-consequential", "mutual-indemnity", "term", "governing-law", "entire-agreement"],
+  "red_flag": false,
+  "word_count": 380,
+  "jurisdiction": "New York"
+}

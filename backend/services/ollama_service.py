@@ -92,6 +92,28 @@ class OllamaService:
         num_predict = options.get("num_predict")
         return isinstance(eval_count, int) and isinstance(num_predict, int) and eval_count >= num_predict
 
+    def _estimate_prompt_tokens(self, messages: list) -> int:
+        total_chars = sum(len(str(m.get("content", ""))) for m in messages)
+        return max(1, total_chars // 4)
+
+    def _run_inference(self, messages: list, model: str, options: dict) -> tuple[str, Optional[Dict[str, Any]]]:
+        stream = ollama_client.chat(
+            model=model,
+            messages=messages,
+            stream=True,
+            options=options
+        )
+        buffer = ""
+        final_chunk: Optional[Dict[str, Any]] = None
+        for chunk in stream:
+            if chunk is None:
+                raise HTTPException(500, "Model communication error: Received null chunk")
+            final_chunk = chunk
+            content = chunk.get("message", {}).get("content", "")
+            if content:
+                buffer += content
+        return buffer, final_chunk
+
     def _generate_with_model(self, messages: list, model: str, mode: str) -> str:
         """Generate complete response from a specific model in single pass."""
         inference_start = None
@@ -101,35 +123,82 @@ class OllamaService:
                 "[InferenceOptimization] num_predict_reduced=%s",
                 generation_options.get("num_predict")
             )
-        try:
-            # Single model call - no retries
-            inference_start = time.time()
-            logger.info("[Inference] Using generation profile -> %s options=%s", profile_name, generation_options)
-            stream = ollama_client.chat(
-                model=model,
-                messages=messages,
-                stream=True,
-                options=generation_options
+
+        MAX_CONTEXT_WINDOW = 8192
+        estimated_tokens = self._estimate_prompt_tokens(messages)
+        current_ctx = generation_options.get("num_ctx", 2048)
+
+        if estimated_tokens > MAX_CONTEXT_WINDOW:
+            overflow_tokens = estimated_tokens - MAX_CONTEXT_WINDOW
+            overflow_chars = overflow_tokens * 4
+            messages = list(messages)
+            for i, msg in enumerate(messages):
+                if msg.get("role") == "user":
+                    content = str(msg.get("content", ""))
+                    keep_chars = max(len(content) - overflow_chars, 0)
+                    messages[i] = {**msg, "content": content[:keep_chars]}
+                    logger.warning(
+                        "[ContextOverflow] estimated_prompt_tokens=%d max_ctx=%d "
+                        "overflow_tokens=%d overflow_chars=%d "
+                        "document_truncated=%d->%d_chars "
+                        "system_prompt_preserved=True",
+                        estimated_tokens, MAX_CONTEXT_WINDOW,
+                        overflow_tokens, overflow_chars,
+                        len(content), keep_chars
+                    )
+                    break
+            estimated_tokens = self._estimate_prompt_tokens(messages)
+            generation_options = dict(generation_options)
+            generation_options["num_ctx"] = MAX_CONTEXT_WINDOW
+            ctx_util_pct = round((estimated_tokens / MAX_CONTEXT_WINDOW) * 100, 1)
+            logger.info(
+                "[ContextMetrics] after_overflow_truncation estimated_prompt_tokens=%d "
+                "context_utilization=%.1f%%",
+                estimated_tokens, ctx_util_pct
+            )
+        elif estimated_tokens > current_ctx:
+            ctx_util_pct = round((estimated_tokens / current_ctx) * 100, 1)
+            logger.info(
+                "[ContextMetrics] estimated_prompt_tokens=%d num_ctx=%d context_utilization=%.1f%% exceeds_ctx=True",
+                estimated_tokens, current_ctx, ctx_util_pct
+            )
+            target_ctx = min(estimated_tokens + 512, MAX_CONTEXT_WINDOW)
+            logger.warning(
+                "[ContextWarning] Prompt exceeds context window: estimated_tokens=%d num_ctx=%d->%d",
+                estimated_tokens, current_ctx, target_ctx
+            )
+            generation_options = dict(generation_options)
+            generation_options["num_ctx"] = target_ctx
+        else:
+            ctx_util_pct = round((estimated_tokens / current_ctx) * 100, 1)
+            logger.info(
+                "[ContextMetrics] estimated_prompt_tokens=%d num_ctx=%d context_utilization=%.1f%% exceeds_ctx=False",
+                estimated_tokens, current_ctx, ctx_util_pct
             )
 
-            buffer = ""
-            final_chunk: Optional[Dict[str, Any]] = None
-            for chunk in stream:
-                if chunk is None:
-                    raise HTTPException(500, "Model communication error: Received null chunk")
+        try:
+            inference_start = time.time()
+            logger.info("[Inference] Using generation profile -> %s options=%s", profile_name, generation_options)
+            buffer, final_chunk = self._run_inference(messages, model, generation_options)
 
-                final_chunk = chunk
-                content = chunk.get("message", {}).get("content", "")
-                if content:
-                    buffer += content
-
-            # Ensure we got some response
             if not buffer.strip():
                 raise HTTPException(500, "Model communication error: Empty response received")
 
             if self._was_truncated(final_chunk, generation_options):
                 logger.warning("[Inference] Response hit generation budget -> profile=%s options=%s", profile_name, generation_options)
-                buffer = f"{buffer.rstrip()}\n\n...response truncated"
+                retry_options = dict(generation_options)
+                retry_options["num_predict"] = 1024
+                logger.warning(
+                    "[InferenceRetry] Retrying with larger generation budget -> num_predict=%s",
+                    retry_options["num_predict"]
+                )
+                retry_buffer, retry_final_chunk = self._run_inference(messages, model, retry_options)
+                if retry_buffer.strip():
+                    if not self._was_truncated(retry_final_chunk, retry_options):
+                        buffer = retry_buffer
+                        generation_options = retry_options
+                    else:
+                        buffer = f"{retry_buffer.rstrip()}\n\n...response truncated"
 
             return buffer
 

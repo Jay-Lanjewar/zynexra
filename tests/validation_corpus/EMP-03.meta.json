@@ -1,0 +1,15 @@
+{
+  "document_id": "EMP-03",
+  "title": "Executive Employment Agreement with Single-Trigger Change of Control",
+  "source": {
+    "type": "synthetic_from_template",
+    "description": "Executive agreement with single-trigger change of control (full acceleration without termination), 24-month severance if terminated, 12-month non-compete"
+  },
+  "type": "EMPLOYMENT",
+  "subtype": "executive",
+  "risk_level": "moderate",
+  "clause_set": ["term", "compensation", "benefits", "confidentiality", "invention-assignment", "change-of-control", "non-compete", "non-solicit", "governing-law"],
+  "red_flag": true,
+  "word_count": 370,
+  "jurisdiction": "Delaware"
+}

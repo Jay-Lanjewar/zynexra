@@ -1,0 +1,36 @@
+{
+  "document_id": "VEN-03",
+  "title": "Professional Services Agreement with Consultant-Owned IP and Client Non-Solicit",
+  "model_under_test": "qwen2.5:3b-instruct",
+  "ground_truth": {
+    "parse_should_succeed": true,
+    "expected_issue_count": 1,
+    "max_allowed_issues": 2,
+    "expected_confidence_label": "HIGH",
+    "min_confidence_score": 0.65,
+    "issues": [
+      {
+        "id": "VEN-03-A",
+        "expected_issue_title": "Consultant Retains All Deliverable IP",
+        "expected_severity": "HIGH",
+        "allowed_severities": ["HIGH", "MEDIUM"],
+        "expected_category": "Intellectual Property",
+        "allowed_categories": ["Intellectual Property", "Enforceability Weakness", "Negotiation Imbalance"],
+        "must_contain_quoted_text_pattern": ["retains all right", "non-exclusive", "license", "intellectual property", "retains all"],
+        "must_not_contain_quoted_text_pattern": [],
+        "must_contain_explanation_pattern": ["intellectual property", "IP", "ownership", "retain", "license"],
+        "must_not_contain_explanation_pattern": [],
+        "rationale": "Consultant retains full ownership of all deliverables created for and paid by Client. Client receives only a non-exclusive, internal-use license. This means Client cannot transfer, sell, or exclusively use the custom work they paid for. This is a significant IP risk that undermines the value of the services."
+      }
+    ],
+    "rationale": "The primary issue is the IP ownership structure: consultant owns everything, client gets only a non-exclusive license. The client non-solicit (Section 5) is a standard non-solicit of consultant's employees and is unlikely to be flagged. No-indemnification is standard for consulting. The limitation of liability is standard. One issue expected."
+  },
+  "evaluation_weights": {
+    "parse_success": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "severity_accuracy": 1.0,
+    "false_positive_penalty": 1.0,
+    "false_negative_penalty": 2.0
+  }
+}

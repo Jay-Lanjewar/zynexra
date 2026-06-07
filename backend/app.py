@@ -12,6 +12,7 @@ from backend.engines.normalization_engine import (
     is_json_response_mode,
     log_regression_debug,
     normalize_audit_response,
+    parse_audit_issues,
     should_debug_regression_case,
 )
 from backend.engines.confidence_engine import audit_scorer, advisory_scorer
@@ -190,7 +191,6 @@ def export_report(session_id: str = Form(...), response_format: Optional[str] = 
         logger.warning("[Schema] No structured response available for export, building from raw text")
         mode = session.get("mode", "AUDIT")
         if mode == "AUDIT":
-            from backend.engines.normalization_engine import parse_audit_issues
             issues = parse_audit_issues(report_text or "")
             structured = build_audit_response(
                 complete_response=report_text or "",
@@ -353,8 +353,9 @@ def ask(q: Query, response_format: Optional[str] = None):
             inference_duration_ms = (time.time() - inference_start) * 1000
             logger.info("[Perf] inference_ms=%.0f", inference_duration_ms)
             logger.info("[FallbackTrace] stage=app_json_response_handoff fallback_used=%s", fallback_used)
+            issues = parse_audit_issues(raw_response)
             normalization_start = time.time()
-            complete_response = normalize_audit_response(raw_response, session["mode"])
+            complete_response, normalized_issues = normalize_audit_response(raw_response, session["mode"], parsed_issues=issues, doc_text=text)
             norm_ms = (time.time() - normalization_start) * 1000
             logger.info("[Perf] normalization_ms=%.0f", norm_ms)
             if should_debug_regression_case(q.session_id, q.task_anchor, text):
@@ -386,7 +387,7 @@ def ask(q: Query, response_format: Optional[str] = None):
         if validation_result.is_valid:
             session["last_report"] = complete_response
             logger.info("[FallbackTrace] stage=app_build_audit_payload fallback_used=%s", fallback_used)
-            structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms)
+            structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms, parsed_issues=normalized_issues)
             if fallback_used:
                 structured["fallback_used"] = True
                 if "metadata" in structured:
@@ -444,8 +445,9 @@ def ask(q: Query, response_format: Optional[str] = None):
             inference_duration_ms = (time.time() - inference_start) * 1000
             logger.info("[Perf] inference_ms=%.0f", inference_duration_ms)
             logger.info("[FallbackTrace] stage=app_streaming_response_handoff fallback_used=%s", fallback_used)
+            issues = parse_audit_issues(raw_response)
             normalization_start = time.time()
-            complete_response = normalize_audit_response(raw_response, session["mode"])
+            complete_response, normalized_issues = normalize_audit_response(raw_response, session["mode"], parsed_issues=issues, doc_text=text)
             norm_ms = (time.time() - normalization_start) * 1000
             logger.info("[Perf] normalization_ms=%.0f", norm_ms)
             if should_debug_regression_case(q.session_id, q.task_anchor, text):
@@ -486,7 +488,7 @@ def ask(q: Query, response_format: Optional[str] = None):
                 final_response = complete_response
                 session["last_report"] = complete_response
                 logger.info("[FallbackTrace] stage=app_streaming_build_payload fallback_used=%s", fallback_used)
-                structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms)
+                structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms, parsed_issues=normalized_issues)
                 if fallback_used:
                     structured["fallback_used"] = True
                     if "metadata" in structured:
@@ -816,11 +818,26 @@ def ask_file(
         if rag_context:
             system_prompt += f"\n\nREFERENCE MATERIAL:\n{rag_context}\n\nUse reference material only to support risk detection. Do not treat it as authoritative."
 
+        if effective_mode == "AUDIT":
+            user_content = text + "\n\n---\nRespond ONLY with a single JSON object matching the schema in the system instructions. No other text."
+        else:
+            user_content = text
+
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": text}
+            {"role": "user", "content": user_content}
         ]
         log_timing("Prompt build", prompt_start)
+
+        system_prompt_len = len(system_prompt)
+        schema_start = system_prompt.find("OUTPUT FORMAT")
+        schema_snippet = system_prompt[schema_start:schema_start + 300] if schema_start >= 0 else "NOT FOUND"
+        logger.info("[PromptDebug] effective_mode=%s system_prompt_length=%d user_content_length=%d text_length=%d",
+                     effective_mode, system_prompt_len, len(user_content), len(text))
+        logger.info("[PromptDebug] schema_instructions_start=%s",
+                     "FOUND" if schema_start >= 0 else "MISSING")
+        logger.info("[PromptDebug] schema_snippet=%s", schema_snippet)
+        logger.info("[PromptDebug] system_prompt=%s", system_prompt)
 
         inference_start = time.time()
 
@@ -836,8 +853,11 @@ def ask_file(
         inference_duration_ms = (time.time() - inference_start) * 1000
         logger.info("[Perf] inference_ms=%.0f", inference_duration_ms)
         logger.info("[FallbackTrace] stage=app_file_upload_handoff fallback_used=%s", fallback_used)
+        response_preview = raw_response[:500].replace("\n", "\\n")
+        logger.info("[ResponseDebug] raw_response_first_500_chars=%s", response_preview)
+        issues = parse_audit_issues(raw_response)
         normalization_start = time.time()
-        complete_response = normalize_audit_response(raw_response, effective_mode)
+        complete_response, normalized_issues = normalize_audit_response(raw_response, effective_mode, parsed_issues=issues, doc_text=text)
         norm_ms = (time.time() - normalization_start) * 1000
         logger.info("[Perf] normalization_ms=%.0f", norm_ms)
         if should_debug_regression_case(session_id, filename, text):
@@ -875,7 +895,7 @@ def ask_file(
         session["last_report"] = complete_response
 
         if json_response_mode:
-            structured = build_mode_json_payload(complete_response, MODEL_NAME, effective_mode, user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms)
+            structured = build_mode_json_payload(complete_response, MODEL_NAME, effective_mode, user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms, parsed_issues=normalized_issues)
             if fallback_used:
                 structured["fallback_used"] = True
                 if "metadata" in structured:

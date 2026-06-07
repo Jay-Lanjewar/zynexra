@@ -1,0 +1,36 @@
+{
+  "document_id": "NDA-03",
+  "title": "Mutual Non-Disclosure Agreement with Embedded Non-Solicitation",
+  "model_under_test": "qwen2.5:3b-instruct",
+  "ground_truth": {
+    "parse_should_succeed": true,
+    "expected_issue_count": 0,
+    "max_allowed_issues": 1,
+    "expected_confidence_label": "HIGH",
+    "min_confidence_score": 0.65,
+    "issues": [
+      {
+        "id": "NDA-03-A",
+        "expected_issue_title": "Non-Solicitation Clause in NDA",
+        "expected_severity": "LOW",
+        "allowed_severities": ["LOW", "MEDIUM"],
+        "expected_category": "Negotiation Imbalance",
+        "allowed_categories": ["Negotiation Imbalance", "Enforceability Weakness", "Confidentiality Risk"],
+        "must_contain_quoted_text_pattern": ["solicit", "employee", "hire"],
+        "must_not_contain_quoted_text_pattern": [],
+        "must_contain_explanation_pattern": ["non-solicit", "solicit", "NDA"],
+        "must_not_contain_explanation_pattern": [],
+        "rationale": "Non-solicitation clauses are unusual in standalone NDAs. While the 12-month duration is within standard range, embedding it in an NDA may create confusion about enforceability and scope. Categorized as optional finding — the model may or may not flag this."
+      }
+    ],
+    "rationale": "The NDA itself is clean with all standard protections. The non-solicit clause is within reasonable duration (12 months). However, non-solicits in NDAs are unusual and may indicate the NDA is being used for purposes beyond confidentiality. This is a borderline finding — the model may not flag it. The ground truth allows 0-1 issues."
+  },
+  "evaluation_weights": {
+    "parse_success": 1.0,
+    "precision": 1.0,
+    "recall": 0.5,
+    "severity_accuracy": 0.5,
+    "false_positive_penalty": 1.0,
+    "false_negative_penalty": 1.0
+  }
+}

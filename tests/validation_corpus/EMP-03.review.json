@@ -1,0 +1,36 @@
+{
+  "document_id": "EMP-03",
+  "title": "Executive Employment Agreement with Single-Trigger Change of Control",
+  "model_under_test": "qwen2.5:3b-instruct",
+  "ground_truth": {
+    "parse_should_succeed": true,
+    "expected_issue_count": 1,
+    "max_allowed_issues": 2,
+    "expected_confidence_label": "HIGH",
+    "min_confidence_score": 0.65,
+    "issues": [
+      {
+        "id": "EMP-03-A",
+        "expected_issue_title": "Single-Trigger Change of Control Acceleration",
+        "expected_severity": "MEDIUM",
+        "allowed_severities": ["LOW", "MEDIUM"],
+        "expected_category": "Enforceability Weakness",
+        "allowed_categories": ["Enforceability Weakness", "Negotiation Imbalance", "Confidentiality Risk"],
+        "must_contain_quoted_text_pattern": ["Change of Control", "accelerate", "fully vested", "change"],
+        "must_not_contain_quoted_text_pattern": [],
+        "must_contain_explanation_pattern": ["change of control", "single-trigger", "accelerat", "vest"],
+        "must_not_contain_explanation_pattern": [],
+        "rationale": "Single-trigger change of control (full acceleration upon change of control without requiring termination) creates a perverse incentive for the executive to facilitate a sale regardless of shareholder interest. Double-trigger (acceleration only if terminated after CIC) is the market standard. This is an unusual provision that weakens corporate governance."
+      }
+    ],
+    "rationale": "The single-trigger change of control is the primary issue. It accelerates all unvested equity upon change of control alone, without requiring termination. This creates a misalignment between executive and shareholder interests. The 24-month severance (if terminated after CIC) is generous but secondary. Other terms (12-month non-compete, reasonable invention assignment) are standard."
+  },
+  "evaluation_weights": {
+    "parse_success": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "severity_accuracy": 1.0,
+    "false_positive_penalty": 1.0,
+    "false_negative_penalty": 1.5
+  }
+}

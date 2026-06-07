@@ -1,0 +1,15 @@
+{
+  "document_id": "VEN-02",
+  "title": "AS-IS SaaS Agreement with No Warranties and Vendor-Favorable Termination",
+  "source": {
+    "type": "synthetic_from_template",
+    "description": "SaaS agreement with AS-IS/no-warranty terms, no SLA, no indemnification, and asymmetric termination (vendor can terminate for convenience, customer cannot)"
+  },
+  "type": "VENDOR_SERVICE",
+  "subtype": "SaaS",
+  "risk_level": "high-risk",
+  "clause_set": ["subscription", "fees", "no-warranty", "no-sla", "liability-cap", "exclusion-of-consequential", "no-indemnity", "termination-asymmetric", "confidentiality", "governing-law", "entire-agreement"],
+  "red_flag": true,
+  "word_count": 300,
+  "jurisdiction": "Delaware"
+}

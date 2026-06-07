@@ -407,7 +407,7 @@ CONTRACT_STRUCTURE_PATTERNS = [
 # Non-legal text patterns (penalized)
 NON_LEGAL_PATTERNS_STRONG = [
     re.compile(r"(?i)\b(?:cup[s]?\s+of\s+|cup[s]?\s+(?:all-purpose|granulated|packed)|tablespoon[s]?|teaspoon[s]?|preheat|preheated|bake|baked|baking|oven\s+\d+|ingredients?|mix\s+(?:together|well|until|in|the|thoroughly)|stir\s+in|beat\s+(?:until|together|in)|baking\s+(?:sheet|soda|powder|dish|pan)|chopped|melted|recipe\s+(?:calls|makes|yields|is|for))\b"),
-    re.compile(r"(?i)\b(?:once\s+upon\s+a\s+time|chapter\s+\d+|the\s+end\.?|\"i\s+(?:said|told|asked|thought|murmured|whispered|shouted|cried|laughed)\"|he\s+(?:whispered|shouted|cried|laughed|murmured)\b|she\s+(?:whispered|shouted|cried|laughed|murmured)\b)"),
+    re.compile(r"(?i)\b(?:once\s+upon\s+a\s+time|chapter\s+\d+|the\s+end\.|\"i\s+(?:said|told|asked|thought|murmured|whispered|shouted|cried|laughed)\"|he\s+(?:whispered|shouted|cried|laughed|murmured)\b|she\s+(?:whispered|shouted|cried|laughed|murmured)\b)"),
     re.compile(r"(?i)\b(?:in\s+my\s+opinion|i\s+think\s+|i\s+believe\s+|i\s+feel\s+|i\s+guess\s+|i\s+suppose\s+|i\s+personally\s+)"),
     re.compile(r"(?i)\b(?:touchdown|quarterback|inning|pitcher|home\s+run|goalkeeper|penalty\s+(?:kick|shot)|free\s+throw|three.?pointer|offside|offensive|defensive\s+(?:lineman|back|tackle|end))\b"),
     re.compile(r"(?i)\b(?:ingredients[:;]|instructions[:;]|directions[:;]|steps[:;]|method[:;]|procedure[:;])\s*$", re.MULTILINE),
@@ -519,6 +519,12 @@ def compute_document_domain_confidence(text: str) -> DomainDetectionResult:
     )
 
     effective_score = max(0.0, legal_signal - non_legal_penalty)
+
+    # Boost for employment agreements: the title pattern alone may not push
+    # the blended score past LEGAL threshold, but employment agreements are
+    # unequivocally legal documents.
+    if re.search(r"(?im)^\s*EMPLOYMENT\s+(?:AGREEMENT|CONTRACT)\b", text):
+        effective_score = max(effective_score, POSSIBLY_LEGAL_THRESHOLD + 0.05)
 
     if effective_score <= NON_LEGAL_THRESHOLD:
         domain = DocumentDomain.NON_LEGAL

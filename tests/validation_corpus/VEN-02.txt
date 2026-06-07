@@ -1,0 +1,23 @@
+SOFTWARE AS A SERVICE AGREEMENT
+
+This Software as a Service Agreement (the "Agreement") is entered into as of [Date] by and between [Provider] ("Provider") and [Customer] ("Customer").
+
+1. SUBSCRIPTION. Provider grants Customer a non-exclusive, non-transferable right to access and use the [Service] during the Subscription Term.
+
+2. FEES. Customer shall pay the fees set forth in the applicable Order Form. All fees are non-refundable and non-cancellable.
+
+3. NO WARRANTIES. THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE." PROVIDER MAKES NO WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, OR NON-INFRINGEMENT. PROVIDER DOES NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED OR ERROR-FREE.
+
+4. NO SERVICE LEVEL AGREEMENT. Provider does not guarantee any level of uptime, availability, or performance. Customer's sole remedy for any service interruption is termination of this Agreement.
+
+5. LIMITATION OF LIABILITY. IN NO EVENT SHALL PROVIDER'S AGGREGATE LIABILITY ARISING OUT OF OR RELATING TO THIS AGREEMENT EXCEED THE TOTAL FEES PAID BY CUSTOMER IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM. IN NO EVENT SHALL PROVIDER BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES.
+
+6. NO INDEMNIFICATION. Provider shall have no obligation to indemnify, defend, or hold harmless Customer from any claims arising out of or relating to the Service, including claims of intellectual property infringement.
+
+7. TERMINATION FOR CONVENIENCE. Provider may terminate this Agreement at any time, for any reason or no reason, upon thirty (30) days' written notice to Customer. Customer may terminate this Agreement only for Provider's material breach that remains uncured for thirty (30) days after written notice.
+
+8. CONFIDENTIALITY. Each party shall hold the other's confidential information in confidence for a period of three (3) years.
+
+9. GOVERNING LAW. This Agreement shall be governed by the laws of the State of Delaware.
+
+10. ENTIRE AGREEMENT. This Agreement constitutes the entire agreement.

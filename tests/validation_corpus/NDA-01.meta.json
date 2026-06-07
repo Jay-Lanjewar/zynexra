@@ -1,0 +1,15 @@
+{
+  "document_id": "NDA-01",
+  "title": "Standard Mutual Non-Disclosure Agreement",
+  "source": {
+    "type": "synthetic_from_template",
+    "description": "Adapted from common mutual NDA template with all standard protections present"
+  },
+  "type": "NDA",
+  "subtype": "mutual",
+  "risk_level": "clean",
+  "clause_set": ["confidentiality", "exclusions", "term", "survival", "return", "no-license", "remedy", "governing-law", "entire-agreement"],
+  "red_flag": false,
+  "word_count": 420,
+  "jurisdiction": "Delaware"
+}

@@ -1,0 +1,19 @@
+CONFIDENTIALITY AGREEMENT
+
+This Confidentiality Agreement (the "Agreement") is made as of [Date] by and between [Company] ("Company") and [Counterparty] ("Counterparty").
+
+1. CONFIDENTIAL INFORMATION. "Confidential Information" means all information disclosed by Company to Counterparty, whether in writing, orally, or by any other means, regardless of whether such information is marked as confidential.
+
+2. OBLIGATIONS. Counterparty shall: (a) hold Confidential Information in confidence using a reasonable degree of care; (b) not disclose Confidential Information to any third party; (c) use Confidential Information only for the Purpose; and (d) limit access to employees with a need to know.
+
+3. EXCLUSIONS. The obligations in Section 2 shall not apply to information that is or becomes generally available to the public other than as a result of a disclosure by Counterparty in violation of this Agreement.
+
+4. TERM AND SURVIVAL. This Agreement shall commence on the Effective Date and continue for a period of one (1) year. Upon the expiration of the one-year term, this Agreement shall automatically renew for successive one-year periods unless either Party provides written notice of non-renewal at least ninety (90) days prior to the end of the then-current term. Confidentiality obligations shall survive termination or expiration of this Agreement perpetually and shall continue in full force and effect indefinitely.
+
+5. RETURN OF MATERIALS. Upon Company's request, Counterparty shall return or destroy all Confidential Information.
+
+6. REMEDIES. Counterparty acknowledges that any breach or threatened breach of this Agreement will cause irreparable harm for which monetary damages would be inadequate. Company shall be entitled to seek temporary and permanent injunctive relief without the necessity of proving actual damages or posting a bond.
+
+7. GOVERNING LAW. This Agreement shall be governed by the laws of the State of Delaware.
+
+8. ENTIRE AGREEMENT. This Agreement constitutes the entire agreement between the parties.

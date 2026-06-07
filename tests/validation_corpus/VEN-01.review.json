@@ -1,0 +1,22 @@
+{
+  "document_id": "VEN-01",
+  "title": "Enterprise SaaS Agreement with Full Protections",
+  "model_under_test": "qwen2.5:3b-instruct",
+  "ground_truth": {
+    "parse_should_succeed": true,
+    "expected_issue_count": 0,
+    "max_allowed_issues": 1,
+    "expected_confidence_label": "HIGH",
+    "min_confidence_score": 0.65,
+    "issues": [],
+    "rationale": "Gold-standard enterprise SaaS agreement. All protections are bilateral and capped: 99.9% SLA with service credits, DPA with SCCs for international data transfers, capped mutual indemnification, bilateral limitation of liability (fees-paid with consequential exclusion), reasonable term and termination. Zero issues expected. The mutual-capped-indemnity suppression and standard NDA suppression should cap any spurious findings to LOW."
+  },
+  "evaluation_weights": {
+    "parse_success": 1.0,
+    "precision": 1.0,
+    "recall": 0.0,
+    "severity_accuracy": 0.0,
+    "false_positive_penalty": 2.0,
+    "false_negative_penalty": 0.0
+  }
+}

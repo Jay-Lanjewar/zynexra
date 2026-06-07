@@ -1,0 +1,21 @@
+MUTUAL NON-DISCLOSURE AGREEMENT
+
+This Mutual Non-Disclosure Agreement (the "Agreement") is entered into as of [Date] by and between [Party A] and [Party B], each referred to as a "Party" and collectively as the "Parties."
+
+1. CONFIDENTIAL INFORMATION. "Confidential Information" means all non-public information disclosed by one Party (the "Disclosing Party") to the other Party (the "Receiving Party"), whether in written, oral, or other form, that is marked as confidential or that a reasonable person would understand to be confidential.
+
+2. OBLIGATIONS. The Receiving Party shall: (a) maintain Confidential Information in confidence; (b) not disclose Confidential Information to any third party without the Disclosing Party's prior written consent; (c) use Confidential Information solely for the Purpose; and (d) restrict access to those employees with a need to know.
+
+3. EXCLUSIONS. Confidential Information does not include information that: (a) is or becomes publicly available without breach; (b) was known prior to disclosure; (c) is independently developed; or (d) is received from a third party without restriction.
+
+4. TERM. This Agreement shall commence on the Effective Date and continue for two (2) years. Confidentiality obligations shall survive for three (3) years after termination.
+
+5. NON-SOLICITATION. During the term of this Agreement and for a period of twelve (12) months thereafter, neither Party shall directly or indirectly solicit, induce, or encourage any employee of the other Party to terminate their employment or engagement, or hire any such employee. This Section 5 shall survive termination of this Agreement.
+
+6. RETURN OF MATERIALS. Upon request, each Party shall promptly return or destroy the other Party's Confidential Information.
+
+7. NO LICENSE. No intellectual property rights are granted under this Agreement.
+
+8. REMEDIES. Each Party acknowledges that monetary damages may be inadequate and that the Disclosing Party is entitled to injunctive relief for any breach.
+
+9. GOVERNING LAW. This Agreement shall be governed by the laws of the State of California.

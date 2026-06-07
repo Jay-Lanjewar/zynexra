@@ -1,0 +1,62 @@
+{
+  "document_id": "VEN-02",
+  "title": "AS-IS SaaS Agreement with No Warranties and Vendor-Favorable Termination",
+  "model_under_test": "qwen2.5:3b-instruct",
+  "ground_truth": {
+    "parse_should_succeed": true,
+    "expected_issue_count": 3,
+    "max_allowed_issues": 4,
+    "expected_confidence_label": "HIGH",
+    "min_confidence_score": 0.65,
+    "issues": [
+      {
+        "id": "VEN-02-A",
+        "expected_issue_title": "AS-IS No Warranty Provision",
+        "expected_severity": "MEDIUM",
+        "allowed_severities": ["MEDIUM", "HIGH"],
+        "expected_category": "Enforceability Weakness",
+        "allowed_categories": ["Enforceability Weakness", "Negotiation Imbalance", "Confidentiality Risk"],
+        "must_contain_quoted_text_pattern": ["AS IS", "AS AVAILABLE", "No Warranties", "no warranty", "AS-IS"],
+        "must_not_contain_quoted_text_pattern": [],
+        "must_contain_explanation_pattern": ["warrant", "AS IS", "no warranty"],
+        "must_not_contain_explanation_pattern": [],
+        "rationale": "The AS-IS/no-warranty provision disclaims all implied warranties (merchantability, fitness, title, non-infringement). In a paid SaaS agreement, this creates significant risk for the customer who is paying for a service with no guarantee of quality or functionality."
+      },
+      {
+        "id": "VEN-02-B",
+        "expected_issue_title": "No Service Level Agreement",
+        "expected_severity": "MEDIUM",
+        "allowed_severities": ["LOW", "MEDIUM"],
+        "expected_category": "Enforceability Weakness",
+        "allowed_categories": ["Enforceability Weakness", "Negotiation Imbalance"],
+        "must_contain_quoted_text_pattern": ["service level", "uptime", "availability", "SLA"],
+        "must_not_contain_quoted_text_pattern": [],
+        "must_contain_explanation_pattern": ["SLA", "service level", "uptime", "availability"],
+        "must_not_contain_explanation_pattern": [],
+        "rationale": "No SLA means no guaranteed uptime, availability, or performance. Customer's only remedy for service interruption is termination, which is inadequate for a business-critical service."
+      },
+      {
+        "id": "VEN-02-C",
+        "expected_issue_title": "Asymmetric Termination Rights",
+        "expected_severity": "MEDIUM",
+        "allowed_severities": ["MEDIUM", "HIGH"],
+        "expected_category": "Negotiation Imbalance",
+        "allowed_categories": ["Negotiation Imbalance", "Enforceability Weakness"],
+        "must_contain_quoted_text_pattern": ["terminate this Agreement at any time", "terminate for convenience", "Provider may terminate"],
+        "must_not_contain_quoted_text_pattern": [],
+        "must_contain_explanation_pattern": ["termination", "asymmetric", "convenience", "vendor", "provider"],
+        "must_not_contain_explanation_pattern": [],
+        "rationale": "Provider can terminate for convenience with 30 days notice, while Customer can only terminate for material breach. This creates a fundamental power imbalance where the customer's business depends on a service the provider can cancel at will."
+      }
+    ],
+    "rationale": "Three distinct issues: (1) AS-IS disclaimer eliminates all warranties for a paid service, (2) no SLA leaves customer without remedy for service failures, (3) asymmetric termination allows vendor to cancel at will while locking customer in. The no-indemnification clause is also notable but may not be separately flagged if the AS-IS clause already covers it."
+  },
+  "evaluation_weights": {
+    "parse_success": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "severity_accuracy": 1.0,
+    "false_positive_penalty": 1.0,
+    "false_negative_penalty": 2.0
+  }
+}

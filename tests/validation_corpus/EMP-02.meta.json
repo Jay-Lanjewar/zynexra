@@ -1,0 +1,15 @@
+{
+  "document_id": "EMP-02",
+  "title": "Employment Agreement with Overbroad Invention Assignment and Excessive Non-Compete",
+  "source": {
+    "type": "synthetic_from_template",
+    "description": "Employment agreement containing overbroad invention assignment (all inventions regardless of time, place, or resources) and 18-month worldwide non-compete"
+  },
+  "type": "EMPLOYMENT",
+  "subtype": "at-will",
+  "risk_level": "high-risk",
+  "clause_set": ["at-will", "compensation", "confidentiality", "invention-assignment-overbroad", "non-compete-excessive", "non-solicit", "governing-law"],
+  "red_flag": true,
+  "word_count": 310,
+  "jurisdiction": "Georgia"
+}

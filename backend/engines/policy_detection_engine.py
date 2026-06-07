@@ -525,6 +525,22 @@ def detect_policy_document(text: str) -> PolicyDetectionResult:
             explanation="Empty or blank text.",
         )
 
+    # Employment agreements are legal contracts, never policy documents.
+    # The "employee + shall" pattern in structure detection (line 383)
+    # and keywords like "notice", "information" can falsely trigger
+    # Institutional Notice classification, so short-circuit here.
+    if re.search(r"(?im)^\s*(?:EXECUTIVE\s+)?EMPLOYMENT\s+(?:AGREEMENT|CONTRACT)\b", text):
+        return PolicyDetectionResult(
+            detection=PolicyDetection.NOT_POLICY,
+            confidence=0.0,
+            policy_keyword_score=0.0,
+            contractual_signal_score=0.0,
+            policy_type="General Policy",
+            matched_policy_keywords=[],
+            matched_contractual_signals=[],
+            explanation="Document is an employment agreement, not a policy document.",
+        )
+
     policy_score, matched_policy_keywords = compute_policy_keyword_score(text)
     contractual_score, matched_contractual_signals = compute_contractual_signal_score(text)
     structure_score = compute_policy_structure_score(text)

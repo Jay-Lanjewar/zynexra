@@ -37,3 +37,22 @@ tmp/
 # databases
 *.db
 data/*.db
+
+# Generated reports
+tests/*report*.md
+tests/*audit*.md
+tests/*comparison*.md
+tests/*assessment*.md
+
+# Generated benchmark outputs
+tests/validation_corpus/phase1_results_*.json
+tests/validation_corpus/phase1_traces_*.json
+tests/validation_corpus/ab_experiment_results.json
+
+# Session files
+.anchored_summary.md
+
+# Debug and one-off investigation scripts
+tests/debug_*.py
+tests/check_*.py
+tests/*_stats.py

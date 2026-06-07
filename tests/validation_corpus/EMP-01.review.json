@@ -1,0 +1,22 @@
+{
+  "document_id": "EMP-01",
+  "title": "Standard At-Will Employment Agreement",
+  "model_under_test": "qwen2.5:3b-instruct",
+  "ground_truth": {
+    "parse_should_succeed": true,
+    "expected_issue_count": 0,
+    "max_allowed_issues": 1,
+    "expected_confidence_label": "HIGH",
+    "min_confidence_score": 0.65,
+    "issues": [],
+    "rationale": "All provisions are within standard ranges: invention assignment has reasonable carveout (California Labor Code 2870-compatible), non-compete is 6 months (within prompt's 6-month threshold), non-solicit is 12 months (within standard range). Standard confidentiality is explicitly not a risk per prompt rules. Zero issues expected."
+  },
+  "evaluation_weights": {
+    "parse_success": 1.0,
+    "precision": 1.0,
+    "recall": 0.0,
+    "severity_accuracy": 0.0,
+    "false_positive_penalty": 2.0,
+    "false_negative_penalty": 0.0
+  }
+}

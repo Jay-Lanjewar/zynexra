@@ -1,0 +1,49 @@
+{
+  "document_id": "EMP-02",
+  "title": "Employment Agreement with Overbroad Invention Assignment and Excessive Non-Compete",
+  "model_under_test": "qwen2.5:3b-instruct",
+  "ground_truth": {
+    "parse_should_succeed": true,
+    "expected_issue_count": 2,
+    "max_allowed_issues": 3,
+    "expected_confidence_label": "HIGH",
+    "min_confidence_score": 0.65,
+    "issues": [
+      {
+        "id": "EMP-02-A",
+        "expected_issue_title": "Overbroad Invention Assignment",
+        "expected_severity": "HIGH",
+        "allowed_severities": ["HIGH"],
+        "expected_category": "Intellectual Property",
+        "allowed_categories": ["Intellectual Property", "Enforceability Weakness"],
+        "must_contain_quoted_text_pattern": ["all inventions", "regardless of when", "anywhere in the world", "any resources"],
+        "must_not_contain_quoted_text_pattern": [],
+        "must_contain_explanation_pattern": ["invention", "assignment", "overbroad"],
+        "must_not_contain_explanation_pattern": [],
+        "rationale": "Invention assignment claims all inventions regardless of when created, where created, or what resources used. This far exceeds the scope permitted under California Labor Code 2870 and similar state laws. The prompt explicitly lists this as the highest-priority employment finding at HIGH severity."
+      },
+      {
+        "id": "EMP-02-B",
+        "expected_issue_title": "Excessive Non-Compete Duration",
+        "expected_severity": "MEDIUM",
+        "allowed_severities": ["MEDIUM", "HIGH"],
+        "expected_category": "Enforceability Weakness",
+        "allowed_categories": ["Enforceability Weakness", "Negotiation Imbalance"],
+        "must_contain_quoted_text_pattern": ["18", "month", "non-compete", "noncompete"],
+        "must_not_contain_quoted_text_pattern": [],
+        "must_contain_explanation_pattern": ["non-compete", "noncompete", "18", "month"],
+        "must_not_contain_explanation_pattern": [],
+        "rationale": "18-month non-compete with worldwide scope exceeds the prompt's 6-month threshold. Prompt rules list non-compete duration as the second-highest priority employment finding. MEDIUM severity is appropriate for a single-state (Georgia) agreement, but HIGH is also acceptable."
+      }
+    ],
+    "rationale": "Two clear issues: (1) overbroad invention assignment covering all inventions anywhere/anytime — prompt explicitly classifies this as HIGH/Intellectual Property, (2) 18-month worldwide non-compete exceeding the 6-month prompt threshold. Self-negating suppression should not fire on HIGH-severity issues."
+  },
+  "evaluation_weights": {
+    "parse_success": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "severity_accuracy": 1.0,
+    "false_positive_penalty": 1.0,
+    "false_negative_penalty": 2.0
+  }
+}

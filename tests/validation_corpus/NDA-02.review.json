@@ -1,0 +1,36 @@
+{
+  "document_id": "NDA-02",
+  "title": "Unilateral Non-Disclosure Agreement with Incomplete Exclusions",
+  "model_under_test": "qwen2.5:3b-instruct",
+  "ground_truth": {
+    "parse_should_succeed": true,
+    "expected_issue_count": 1,
+    "max_allowed_issues": 2,
+    "expected_confidence_label": "HIGH",
+    "min_confidence_score": 0.65,
+    "issues": [
+      {
+        "id": "NDA-02-A",
+        "expected_issue_title": "Incomplete Confidentiality Exclusions",
+        "expected_severity": "MEDIUM",
+        "allowed_severities": ["LOW", "MEDIUM"],
+        "expected_category": "Enforceability Weakness",
+        "allowed_categories": ["Enforceability Weakness", "Confidentiality Risk", "Confidentiality"],
+        "must_contain_quoted_text_pattern": ["Independent development", "third party", "prior knowledge", "publicly available"],
+        "must_not_contain_quoted_text_pattern": [],
+        "must_contain_explanation_pattern": ["exclusion", "confidential"],
+        "must_not_contain_explanation_pattern": [],
+        "rationale": "NDA-02 has only 2 standard exclusions (public availability and prior knowledge), missing independent development and third-party receipt. This creates an asymmetric risk for the receiving party. Standard NDA suppression may cap to LOW if categorized as confidentiality risk."
+      }
+    ],
+    "rationale": "The confidentiality definition is broad ('all information') and exclusions are incomplete. Only public availability and prior knowledge are excluded; independent development and third-party receipt are missing. This is a genuine risk for the receiving party. Severity may be LOW (if categorized as confidentiality and StandardNDA suppression fires) or MEDIUM (if categorized as Enforceability Weakness)."
+  },
+  "evaluation_weights": {
+    "parse_success": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "severity_accuracy": 1.0,
+    "false_positive_penalty": 1.0,
+    "false_negative_penalty": 2.0
+  }
+}

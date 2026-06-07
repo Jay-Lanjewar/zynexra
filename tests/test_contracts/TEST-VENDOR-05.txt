@@ -1,0 +1,35 @@
+VENDOR SERVICES AGREEMENT
+
+This Vendor Services Agreement ("Agreement") is made as of June 1, 2025, between Precision Logistics Inc., a Georgia corporation ("Vendor"), and Southeastern Distribution Corp., a Florida corporation ("Customer").
+
+1. SERVICES
+Vendor shall provide warehousing, inventory management, and distribution services as described in Exhibit A.
+
+2. TERM
+This Agreement shall be effective for thirty-six (36) months. Automatically renews for successive twelve-month periods unless terminated by either party with sixty (60) days' prior written notice.
+
+3. PRICING
+Customer shall pay Vendor the fees set forth in Exhibit B. Vendor may increase fees upon one hundred eighty (180) days' written notice. All price increases shall not exceed five percent (5%) per year.
+
+4. SERVICE LEVELS
+Vendor shall maintain: (a) order accuracy of at least 99.5%; (b) on-time shipment rate of at least 98%; (c) inventory accuracy of at least 99%.
+
+5. INSURANCE
+Vendor shall maintain commercial general liability insurance of at least $5,000,000 per occurrence, workers' compensation as required by law, and automobile liability insurance of at least $2,000,000.
+
+6. INDEMNIFICATION
+Vendor shall indemnify, defend, and hold harmless Customer from any claims, damages, or expenses arising from Vendor's negligence, willful misconduct, or breach of this Agreement.
+
+7. LIMITATION OF LIABILITY
+VENDOR'S TOTAL LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED THE GREATER OF (A) THE FEES PAID BY CUSTOMER IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM, OR (B) $500,000.
+
+8. CONFIDENTIALITY
+Each party shall maintain the confidentiality of the other party's proprietary information and shall not disclose such information to third parties without prior written consent.
+
+9. TERMINATION FOR CONVENIENCE
+Customer may terminate this Agreement for any reason upon ninety (90) days' written notice. Upon termination, Customer shall pay for all services rendered through the termination date.
+
+10. GOVERNING LAW
+This Agreement shall be governed by the laws of the State of Florida.
+
+EXECUTED as of the date first written above.

@@ -1,0 +1,15 @@
+{
+  "document_id": "NDA-04",
+  "title": "Confidentiality Agreement with Auto-Renewal and Perpetual Survival",
+  "source": {
+    "type": "synthetic_from_template",
+    "description": "Unilateral confidentiality agreement with automatic renewal and perpetual (indefinite) confidentiality survival obligation"
+  },
+  "type": "NDA",
+  "subtype": "unilateral",
+  "risk_level": "high-risk",
+  "clause_set": ["confidentiality", "exclusions-incomplete", "term", "auto-renewal", "survival-perpetual", "return", "remedy", "governing-law", "entire-agreement"],
+  "red_flag": true,
+  "word_count": 280,
+  "jurisdiction": "Delaware"
+}

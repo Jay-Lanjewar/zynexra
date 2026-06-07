@@ -1,0 +1,15 @@
+{
+  "document_id": "NDA-02",
+  "title": "Unilateral Non-Disclosure Agreement with Incomplete Exclusions",
+  "source": {
+    "type": "synthetic_from_template",
+    "description": "One-way NDA where exclusions are limited to public availability and prior knowledge only, missing independent development and third-party receipt exclusions"
+  },
+  "type": "NDA",
+  "subtype": "unilateral",
+  "risk_level": "high-risk",
+  "clause_set": ["confidentiality", "exclusions-incomplete", "term", "survival", "return", "no-license", "remedy", "governing-law", "no-assignment"],
+  "red_flag": true,
+  "word_count": 340,
+  "jurisdiction": "New York"
+}

@@ -529,30 +529,57 @@ def build_audit_json_payload(
     user_input: str = "",
     fallback_used: bool = False,
     inference_duration_ms: float = 0,
+    parsed_issues: Optional[List[AuditIssue]] = None,
 ) -> Dict[str, Any]:
-    """Build a machine-readable audit response with single-pass processing."""
+    """Build a machine-readable audit response with single-pass processing.
+
+    When parsed_issues is provided, uses them directly (no re-parse).
+    When None, parses from complete_response (legacy path).
+    """
     logger.info("[FallbackTrace] stage=build_audit_json_payload_entry fallback_used=%s", fallback_used)
     logger.info("[InputMetrics] extracted_text_length=%d complete_response_length=%d",
                 len(user_input), len(complete_response))
     pipeline_start = time.time()
 
-    # --- Parse ---
-    parse_start = time.time()
-    issues = parse_audit_issues(complete_response)
-    parse_failed = len(issues) == 0
-    parse_ms = (time.time() - parse_start) * 1000
-    if parse_failed:
-        logger.info("[FallbackTrace] stage=parse_failed fallback_used=%s", fallback_used)
-
-    # --- Normalization ---
-    norm_start = time.time()
+    # --- Parse (single source of truth when pre-parsed) ---
+    parse_ms = 0.0
     duplicate_suppressed = 0
-    if not parse_failed:
+    if parsed_issues is not None:
+        issues = parsed_issues
+        parse_failed = len(issues) == 0
+        if parse_failed:
+            logger.info("[FallbackTrace] stage=parse_failed (pre-parsed) fallback_used=%s", fallback_used)
+    else:
+        parse_start = time.time()
+        issues = parse_audit_issues(complete_response)
+        parse_failed = len(issues) == 0
+        parse_ms = (time.time() - parse_start) * 1000
+        if parse_failed:
+            logger.info("[FallbackTrace] stage=parse_failed fallback_used=%s", fallback_used)
+
+    # --- Normalization (only when not pre-parsed) ---
+    norm_start = time.time()
+    if parsed_issues is None and not parse_failed:
         original_count = len(issues)
         issues = normalize_audit_issue_severity_fields(issues)
         issues = normalize_audit_issue_fields(issues)
         duplicate_suppressed = original_count - len(issues)
 
+    # --- Post-normalization pipeline fixes (document-level checks) ---
+    if not parse_failed and user_input:
+        # Fix 2: Document-level BMI recalibration (cross-clause cap/exclusion detection)
+        _apply_document_level_bmi(issues, user_input)
+
+        # Fix 3: Standard NDA suppression (confidentiality findings with standard protections)
+        _apply_standard_nda_suppression(issues, user_input)
+
+        # Fix 4: Mutual capped indemnity suppression (balanced mutual indemnity with cap + exclusion)
+        _apply_mutual_capped_indemnity_suppression(issues, user_input)
+
+        # Fix 5: Asymmetry detection (one-sided indemnification)
+        _apply_asymmetry_detection(issues, user_input)
+
+    if not parse_failed:
         contradictions = validate_contradictions(issues, user_input)
         if contradictions:
             issues = apply_contradiction_suppression(issues, contradictions)
@@ -607,87 +634,75 @@ def build_audit_json_payload(
             )
     policy_ms = (time.time() - policy_start) * 1000
 
-    # --- Non-Legal Detection ---
-    non_legal_start = time.time()
+    # --- Domain Detection (single pass, cached) ---
+    # Compute domain once and reuse to eliminate double-call inconsistency
+    # (the two separate calls could return different results for borderline docs).
+    domain_start = time.time()
+    domain_suppressed = False
     non_legal_detected = False
     non_legal_result = None
+    domain_metadata = {}
+    cached_domain_result = None
     if user_input and not semantic_suppressed and not policy_detected:
-        non_legal_domain = compute_document_domain_confidence(user_input)
-        if non_legal_domain.domain == DocumentDomain.NON_LEGAL:
+        cached_domain_result = compute_document_domain_confidence(user_input)
+        if cached_domain_result.domain == DocumentDomain.NON_LEGAL:
+            # Non-legal suppression (same behavior as before)
             non_legal_detected = True
             content_type, content_explanation, _ = classify_non_legal_content(user_input)
             non_legal_result = {
                 "content_type": content_type,
                 "content_explanation": content_explanation,
-                "domain_confidence": non_legal_domain.confidence,
-                "legal_keyword_ratio": non_legal_domain.legal_keyword_ratio,
-                "structure_score": non_legal_domain.structure_score,
+                "domain_confidence": cached_domain_result.confidence,
+                "legal_keyword_ratio": cached_domain_result.legal_keyword_ratio,
+                "structure_score": cached_domain_result.structure_score,
             }
             logger.warning(
                 "[NonLegalDetection] NON-LEGAL DETECTED: type=%s domain_confidence=%.4f "
                 "legal_keyword_ratio=%.4f structure_score=%.4f",
-                content_type, non_legal_domain.confidence,
-                non_legal_domain.legal_keyword_ratio, non_legal_domain.structure_score,
+                content_type, cached_domain_result.confidence,
+                cached_domain_result.legal_keyword_ratio, cached_domain_result.structure_score,
             )
             issues = []
             parse_failed = True
             complete_response = NON_LEGAL_SUPPRESSION_MESSAGE.format(content_type=content_type)
         else:
+            # Domain metadata (reuses the cached result)
+            domain_metadata = {
+                "domain": cached_domain_result.domain.value,
+                "domain_confidence": round(cached_domain_result.confidence, 4),
+            }
             logger.info(
                 "[NonLegalDetection] No non-legal suppression: domain=%s confidence=%.4f",
-                non_legal_domain.domain.value, non_legal_domain.confidence,
+                cached_domain_result.domain.value, cached_domain_result.confidence,
             )
-    non_legal_ms = (time.time() - non_legal_start) * 1000
-
-    # --- Domain Detection ---
-    domain_start = time.time()
-    domain_suppressed = False
-    if user_input and not semantic_suppressed and not policy_detected and not non_legal_detected:
-        domain_result = compute_document_domain_confidence(user_input)
-        domain_metadata = {
-            "domain": domain_result.domain.value,
-            "domain_confidence": round(domain_result.confidence, 4),
-        }
-        # Skip domain suppression when structured parsing already failed.
-        # Parse failures often stem from LLM output quality issues rather than
-        # the document being non-legal. Cascading into domain suppression would
-        # lose the original response entirely, confusing users with a generic
-        # "not a legal contract" message when the document is valid but the LLM
-        # produced malformed output.
-        domain_is_non_legal = domain_result.domain == DocumentDomain.NON_LEGAL
-        if domain_is_non_legal:
-            if parse_failed:
-                logger.info(
-                    "[DomainDetection] SUPPRESSION SKIPPED — parse_failed=True "
-                    "domain=%s effective_score=%.4f "
-                    "legal_keyword_ratio=%.4f structure_score=%.4f "
-                    "legal_phrase_density=%.4f non_legal_penalty=%.4f",
-                    domain_result.domain.value, domain_result.confidence,
-                    domain_result.legal_keyword_ratio, domain_result.structure_score,
-                    domain_result.legal_phrase_density, domain_result.non_legal_penalty,
-                )
+            # Domain suppression check (only when parse succeeded)
+            if cached_domain_result.domain == DocumentDomain.NON_LEGAL:
+                if parse_failed:
+                    logger.info(
+                        "[DomainDetection] SUPPRESSION SKIPPED -- parse_failed=True "
+                        "domain=%s effective_score=%.4f",
+                        cached_domain_result.domain.value, cached_domain_result.confidence,
+                    )
+                else:
+                    domain_suppressed = True
+                    logger.warning(
+                        "[DomainDetection] SUPPRESSION TRIGGERED: domain=NON_LEGAL "
+                        "legal_keyword_ratio=%.4f structure_score=%.4f "
+                        "legal_phrase_density=%.4f non_legal_penalty=%.4f "
+                        "effective_score=%.4f",
+                        cached_domain_result.legal_keyword_ratio, cached_domain_result.structure_score,
+                        cached_domain_result.legal_phrase_density, cached_domain_result.non_legal_penalty,
+                        cached_domain_result.confidence,
+                    )
+                    issues = []
+                    parse_failed = True
+                    complete_response = DOMAIN_SUPPRESSION_MESSAGE
             else:
-                domain_suppressed = True
-                logger.warning(
-                    "[DomainDetection] SUPPRESSION TRIGGERED: domain=NON_LEGAL "
-                    "legal_keyword_ratio=%.4f structure_score=%.4f "
-                    "legal_phrase_density=%.4f non_legal_penalty=%.4f "
-                    "effective_score=%.4f",
-                    domain_result.legal_keyword_ratio, domain_result.structure_score,
-                    domain_result.legal_phrase_density, domain_result.non_legal_penalty,
-                    domain_result.confidence,
+                logger.info(
+                    "[DomainDetection] No suppression: domain=%s effective_score=%.4f "
+                    "parse_failed=%s",
+                    cached_domain_result.domain.value, cached_domain_result.confidence, parse_failed,
                 )
-                issues = []
-                parse_failed = True
-                complete_response = DOMAIN_SUPPRESSION_MESSAGE
-        else:
-            logger.info(
-                "[DomainDetection] No suppression: domain=%s effective_score=%.4f "
-                "parse_failed=%s",
-                domain_result.domain.value, domain_result.confidence, parse_failed,
-            )
-    else:
-        domain_metadata = {}
     domain_ms = (time.time() - domain_start) * 1000
 
     # --- Confidence ---
@@ -699,6 +714,10 @@ def build_audit_json_payload(
         fallback_used=fallback_used,
         duplicate_suppressed=duplicate_suppressed,
         input_quality_degraded=input_quality_degraded,
+        issues=parsed_issues,
+        doc_text=user_input,
+        policy_detected=policy_detected,
+        non_legal_detected=non_legal_detected,
     )
 
     if domain_suppressed:
@@ -718,7 +737,7 @@ def build_audit_json_payload(
     logger.info("[Perf] normalization_ms=%.0f", normalization_ms)
     logger.info("[Perf] quality_ms=%.0f", quality_ms)
     logger.info("[Perf] policy_ms=%.0f", policy_ms)
-    logger.info("[Perf] non_legal_ms=%.0f", non_legal_ms)
+    logger.info("[Perf] domain_ms=%.0f", domain_ms)
     logger.info("[Perf] domain_ms=%.0f", domain_ms)
     logger.info("[Perf] confidence_ms=%.0f", confidence_ms)
     logger.info("[Perf] total_ms=%.0f", total_ms)
@@ -816,6 +835,7 @@ def build_mode_json_payload(
     user_query: str = "",
     fallback_used: bool = False,
     inference_duration_ms: float = 0,
+    parsed_issues: Optional[List[AuditIssue]] = None,
 ) -> Dict[str, Any]:
     """Build mode-aware JSON while preserving legacy text compatibility."""
     logger.info("[FallbackTrace] stage=build_mode_json_payload_entry fallback_used=%s mode=%s", fallback_used, mode)
@@ -826,6 +846,7 @@ def build_mode_json_payload(
             user_input=user_query,
             fallback_used=fallback_used,
             inference_duration_ms=inference_duration_ms,
+            parsed_issues=parsed_issues,
         )
 
     if normalized_mode == "ADVISORY":
@@ -920,6 +941,255 @@ def render_legacy_audit_text(response_text: str, issues: List[AuditIssue]) -> st
     if suffix:
         rendered = f"{rendered}\n\n{suffix}" if rendered else suffix
     return rendered
+
+def _apply_standard_nda_suppression(issues: List[AuditIssue], full_text: str) -> int:
+    """Cap confidentiality-related findings to LOW when the document contains
+    standard NDA protections: exclusions clause + explicit term/survival + return/destruction.
+
+    Returns the number of modified issues.
+    """
+    if not issues or not full_text:
+        return 0
+
+    full_lower = full_text.lower()
+
+    # Detect standard NDA protections in the full document text
+    has_exclusions = bool(re.search(
+        r"\b(?:exclusions?\s+from\s+confidential\s+information|"
+        r"confidential\s+information\s+does\s+not\s+include|"
+        r"information\s+that\s+is\s+or\s+becomes\s+publicly|"
+        r"rightfully\s+known|independently\s+developed)\b",
+        full_lower, re.IGNORECASE
+    ))
+    has_term = bool(re.search(
+        r"\b(?:term|period|duration|survival|continue)\b.*\b(?:year|month|day)s?\b",
+        full_lower, re.IGNORECASE
+    ))
+    has_return = bool(re.search(
+        r"\b(?:return|destroy|destruction|certify)\b.*\b(?:confidential\s+information|materials)\b",
+        full_lower, re.IGNORECASE
+    ))
+
+    if not (has_exclusions and has_term and has_return):
+        return 0
+
+    severity_rank = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+    modified = 0
+
+    # Confidentiality-related category keywords
+    conf_categories = {
+        "confidentiality", "confidentiality risk", "confidentiality termination",
+        "privacy risk", "residuals", "liability exposure",
+    }
+
+    for issue in issues:
+        cat_lower = issue.category.strip().lower()
+        title_lower = issue.issue_title.lower()
+
+        is_confidentiality = any(
+            c in cat_lower or c in title_lower
+            for c in conf_categories
+        ) or bool(re.search(
+            r"\b(?:confidential|privac|survival|residual|exclusion)\b",
+            title_lower, re.IGNORECASE
+        ))
+
+        if not is_confidentiality:
+            continue
+
+        current_sev = issue.severity.strip().upper()
+        if severity_rank.get(current_sev, -1) > severity_rank["LOW"]:
+            issue.severity = "LOW"
+            modified += 1
+            logger.info(
+                "[StandardNDA] Downgraded '%s' to LOW (standard NDA protections detected)",
+                issue.issue_title,
+            )
+
+    if modified:
+        logger.info("[StandardNDA] Total downgrades: %d", modified)
+    return modified
+
+
+def _apply_mutual_capped_indemnity_suppression(issues: List[AuditIssue], full_text: str) -> int:
+    """Cap indemnity/liability findings to LOW when the document contains
+    mutual indemnification, an explicit liability cap, AND consequential
+    damage exclusion — and the finding has no additional risk indicators.
+
+    Trigger conditions (ALL must be true):
+      1. Document: mutual indemnification language
+      2. Document: explicit liability cap
+      3. Document: consequential/indirect damage exclusion
+      4. Severity: LOW or MEDIUM
+      5. Category: Liability Exposure | Enforceability Weakness | Indemnification
+      6. Explanation: does NOT contain asymmetry/uncapped/unlimited/one-sided/perpetual/statutory violation
+
+    Action: downgrade severity to LOW.
+
+    Returns the number of modified issues.
+    """
+    if not issues or not full_text:
+        return 0
+
+    full_lower = full_text.lower()
+
+    # 1. Mutual indemnification language
+    has_mutual = bool(re.search(
+        r"\b(?:each party\b.*\bindemnif(?:y|ies)\b.*\bthe other|"
+        r"mutual indemnit(?:y|ation)|"
+        r"both parties\b.*\bindemnif(?:y|ies))",
+        full_lower, re.IGNORECASE
+    ))
+    if not has_mutual:
+        return 0
+
+    # 2. Explicit liability cap
+    has_cap = bool(re.search(
+        r"\b(?:liability cap|aggregate cap|capped at|maximum liability|"
+        r"shall not exceed|limited to|cap of|shall\s+exceed)\b",
+        full_lower, re.IGNORECASE
+    ))
+    if not has_cap:
+        return 0
+
+    # 3. Consequential / indirect damage exclusion
+    has_exclusion = bool(re.search(
+        r"\b(?:(?:consequential|indirect)\s+damages|indirect\b.{0,50}\bdamages)\b",
+        full_lower, re.IGNORECASE
+    ))
+    if not has_exclusion:
+        return 0
+
+    allowed_categories = frozenset({
+        "liability exposure",
+        "enforceability weakness",
+        "indemnification",
+    })
+
+    forbidden_pattern = re.compile(
+        r"(?i)(asymmetry|uncapped|unlimited|one-sided|perpetual|statutory\s+violation)"
+    )
+
+    severity_rank = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+    modified = 0
+
+    for issue in issues:
+        cat_lower = issue.category.strip().lower()
+        if cat_lower not in allowed_categories:
+            continue
+
+        current_sev = issue.severity.strip().upper()
+        if severity_rank.get(current_sev, -1) > severity_rank["MEDIUM"]:
+            continue
+        if severity_rank.get(current_sev, -1) < severity_rank["LOW"]:
+            continue
+
+        exp_lower = (issue.risk_explanation or "").lower()
+        if forbidden_pattern.search(exp_lower):
+            continue
+
+        if severity_rank.get(current_sev, -1) > severity_rank["LOW"]:
+            issue.severity = "LOW"
+            modified += 1
+            logger.info(
+                "[MutualCappedIndemnity] Downgraded '%s' from %s to LOW "
+                "(mutual capped indemnity detected)",
+                issue.issue_title, current_sev,
+            )
+
+    if modified:
+        logger.info("[MutualCappedIndemnity] Total downgrades: %d", modified)
+    return modified
+
+
+def _apply_asymmetry_detection(issues: List[AuditIssue], full_text: str) -> int:
+    """Detect one-sided indemnification patterns and reclassify.
+
+    When the document has indemnity running only one way with no reciprocal
+    obligation, set category to 'Negotiation Imbalance' and cap severity at HIGH
+    (unless the issue already has unlimited/uncapped indicators, in which case
+    preserve the higher severity).
+    """
+    if not issues or not full_text:
+        return 0
+
+    full_lower = full_text.lower()
+
+    # Detect one-sided indemnity: one party indemnifies with no reciprocal obligation
+    has_one_way_indemnity = bool(re.search(
+        r"\b(?:no\s+obligation\s+to\s+indemnif|"
+        r"shall\s+have\s+no\s+obligation.*indemnif|"
+        r"no\s+indemnification\s+by|"
+        r"does\s+not\s+agree\s+to\s+indemnif|"
+        r"shall\s+not\s+indemnif)\b",
+        full_lower, re.IGNORECASE
+    ))
+
+    # Check if there's one-way AND the other direction is absent
+    # Look for "X agrees to indemnify" without reciprocal "Y agrees to indemnify"
+    has_one_way_pattern = bool(re.search(
+        r"\b(indemnif|hold\s+harmless)\b",
+        full_lower, re.IGNORECASE
+    ))
+    has_explicit_no_indemnity = bool(re.search(
+        r"\bno\s+indemnif|shall\s+not\s+indemnif|no\s+obligation\s+to\s+indemnif",
+        full_lower, re.IGNORECASE
+    ))
+    # Check if mutual indemnity language is absent
+    has_mutual_language = bool(re.search(
+        r"\b(each\s+party|mutual|both\s+parties|reciprocal)\b",
+        full_lower, re.IGNORECASE
+    ))
+
+    is_asymmetric = (has_one_way_pattern and has_explicit_no_indemnity) or \
+                    (has_one_way_indemnity and not has_mutual_language)
+
+    if not is_asymmetric:
+        return 0
+
+    severity_rank = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+    unlimited_pattern = re.compile(r"\b(unlimited|uncapped)\b|no cap|no limit", re.IGNORECASE)
+    modified = 0
+
+    for issue in issues:
+        cat_lower = issue.category.strip().lower()
+        title_lower = issue.issue_title.lower()
+
+        # Check if this issue is indemnity-related
+        is_indemnity = bool(re.search(
+            r"\b(indemn|indemnif)\b",
+            cat_lower + " " + title_lower,
+            re.IGNORECASE
+        ))
+
+        if not is_indemnity:
+            continue
+
+        # Reclassify to Negotiation Imbalance
+        if issue.category != "Negotiation Imbalance":
+            logger.info(
+                "[Asymmetry] Reclassifying '%s' from '%s' to 'Negotiation Imbalance'",
+                issue.issue_title, issue.category,
+            )
+            issue.category = "Negotiation Imbalance"
+            modified += 1
+
+        # Cap severity at HIGH unless unlimited/uncapped exposure
+        current_sev = issue.severity.strip().upper()
+        is_unlimited = bool(unlimited_pattern.search(issue.quoted_text or "")) or \
+                       bool(unlimited_pattern.search(issue.risk_explanation or ""))
+        if not is_unlimited and severity_rank.get(current_sev, -1) > severity_rank["HIGH"]:
+            issue.severity = "HIGH"
+            logger.info(
+                "[Asymmetry] Capped '%s' severity to HIGH (asymmetric, not uncapped)",
+                issue.issue_title,
+            )
+            modified += 1
+
+    if modified:
+        logger.info("[Asymmetry] Total modifications: %d", modified)
+    return modified
+
 
 def _check_balanced_mutual_indemnity(text: str) -> dict:
     """Check if text contains balanced mutual indemnity with all three protections.
@@ -1019,20 +1289,42 @@ def normalize_audit_issue_severity_fields(issues: List[AuditIssue]) -> List[Audi
             if severity_rank.get(new_severity, -1) > severity_rank["LOW"]:
                 new_severity = "LOW"
 
-        # Broader capped mutual indemnity downgrade for patterns detected
-        # by the existing regex (acts as safety net for variants).
+        # Broader capped indemnity / standard limitation of liability downgrade.
+        # Removed has_mutual requirement: ANY indemnity with cap + exclusion is MEDIUM.
+        # Added standard limitation-of-liability branch: cap + exclusion + liability context
+        # (no indemnity keyword needed) is also MEDIUM.
         if severity_rank.get(new_severity, -1) >= severity_rank["HIGH"]:
             quoted = issue.quoted_text or ""
-            has_cap = bool(capped_indemnity_cues.search(quoted))
-            has_indemnity = bool(re.search(r"\b(indemn|indemnify|indemnity|hold harmless)\b", quoted, re.IGNORECASE))
-            has_mutual = bool(re.search(r"\b(each party|mutual|both parties|reciprocal)\b", quoted, re.IGNORECASE))
-            has_exclusion = bool(re.search(
-                r"\b(excluding|exclude|exclusion)\b.+\b(indirect|consequential)\b",
+            has_cap = bool(re.search(
+                r"\b(?:capped at|liability cap|aggregate cap|shall not exceed|shall exceed|"
+                r"must not exceed|may not exceed|limited to|maximum amount|up to|cap of|"
+                r"total fees|fees?\s+paid)\b",
                 quoted, re.IGNORECASE
             ))
-            if has_indemnity and has_cap and has_mutual and has_exclusion:
-                if severity_rank.get(new_severity, -1) > severity_rank["MEDIUM"]:
-                    new_severity = "MEDIUM"
+            has_indemnity = bool(re.search(r"\b(indemn|indemnify|indemnity|hold harmless)\b", quoted, re.IGNORECASE))
+            has_exclusion = bool(re.search(
+                r"(?:\b(excluding|exclude|exclusion|waiv|waiver)\b.+\b(indirect|consequential)\b"
+                r"|\bliable\b.*\bfor\b.*\b(?:indirect|consequential)\b"
+                r"|\bno\s+liability\s+for\s+(?:indirect|consequential)\b"
+                r"|\bnot\s+be\s+liable\s+for\b.*\b(?:indirect|consequential)\b)",
+                quoted, re.IGNORECASE
+            ))
+
+            # Don't downgrade when the quoted text explicitly says unlimited/uncapped
+            # (the unlimited_pattern check at line 1017 already set CRITICAL for these).
+            has_unlimited_text = bool(unlimited_pattern.search(quoted))
+
+            if not has_unlimited_text:
+                if has_indemnity and has_cap and has_exclusion:
+                    if severity_rank.get(new_severity, -1) > severity_rank["MEDIUM"]:
+                        new_severity = "MEDIUM"
+
+                # Standard limitation of liability (cap + exclusion without indemnity keyword)
+                if not has_indemnity and has_cap and has_exclusion:
+                    has_liability_lang = bool(re.search(r"\b(?:liability|damages|loss|indirect|consequential)\b", quoted, re.IGNORECASE))
+                    if has_liability_lang:
+                        if severity_rank.get(new_severity, -1) > severity_rank["MEDIUM"]:
+                            new_severity = "MEDIUM"
 
         if new_severity and new_severity != current_severity:
             issue.severity = new_severity
@@ -1242,20 +1534,348 @@ def suppress_balanced_mutual_indemnity_issues(issues: List[AuditIssue]) -> List[
     return kept
 
 
-def normalize_audit_response(response_text: str, mode: str = "AUDIT") -> str:
-    """Normalize audit output through structured issues and render legacy text."""
-    if mode != "AUDIT":
-        return response_text
+_SLA_KEYWORDS = [
+    "service level", "uptime", "availability", "99.5%", "98%", "99%",
+    "sla", "guarantee", "maintain",
+]
 
-    structured_issues = parse_audit_issues(response_text)
+_SLA_NEGATIVE_PATTERNS = [
+    "no service level", "no sla", "does not guarantee",
+    "no guarantee", "not warrant", "as is", "as-available",
+]
+
+
+def suppress_false_sla_findings(issues: List[AuditIssue], doc_text: str = "") -> List[AuditIssue]:
+    """Suppress 'No Service Level Agreement' findings when the contract contains SLA keywords.
+    
+    The model sometimes generates 'No SLA' findings even when the contract explicitly
+    contains SLA commitments (e.g., '99.5% uptime', 'service levels'). This function
+    checks the contract text for SLA-related keywords and suppresses false findings.
+    
+    Does NOT suppress if the contract explicitly says "no SLA" or "does not guarantee".
+    """
+    if not doc_text:
+        return issues
+    
+    text_lower = doc_text.lower()
+    
+    # Check for negative patterns — if present, the contract explicitly disclaims SLA
+    has_negative = any(p in text_lower for p in _SLA_NEGATIVE_PATTERNS)
+    if has_negative:
+        return issues
+    
+    has_sla_keywords = any(kw in text_lower for kw in _SLA_KEYWORDS)
+    
+    if not has_sla_keywords:
+        return issues
+    
+    kept = []
+    suppressed_count = 0
+    for issue in issues:
+        title = (issue.issue_title or "").lower()
+        if "no service level agreement" in title or "no sla" in title:
+            suppressed_count += 1
+            logger.info(
+                "[Normalization] Suppressing false 'No SLA' finding — contract contains SLA keywords. "
+                "quoted_text_preview=%s",
+                (issue.quoted_text or "")[:80],
+            )
+            continue
+        kept.append(issue)
+    
+    if suppressed_count:
+        logger.info("[Normalization] False SLA suppressions -> %s", suppressed_count)
+    
+    return kept
+
+
+_TITLE_TOPIC_WORDS: Dict[str, List[str]] = {
+    "non-compete": ["non-compete", "compete", "competition", "non-competition", "restrictive"],
+    "non-solicitation": ["solicit", "solicitation", "recruit", "hire", "poach"],
+    "confidentiality": ["confidential", "confidentiality", "disclosure", "proprietary", "trade secret"],
+    "indemnification": ["indemnif", "hold harmless", "defend"],
+    "liability": ["liability", "damages", "loss", "indirect", "consequential", "cap", "exceed"],
+    "intellectual property": ["intellectual property", "patent", "copyright", "invention", "deliverable", "ip "],
+    "change of control": ["change of control", "merger", "acquisition", "consolidation", "coc"],
+    "termination": ["termination", "terminate", "cancel", "expire"],
+    "governing law": ["governing law", "jurisdiction", "venue", "forum"],
+    "warranty": ["warranty", "warrant", "guarantee", "representation", "fitness"],
+    "survival": ["survive", "survival", "surviving", "remain in effect"],
+    "excessive duration": ["excessive", "unreasonable", "duration", "eighteen", "twelve", "months"],
+    "asymmetric": ["asymmetric", "one-sided", "unilateral", "unequal"],
+    "perpetual": ["perpetual", "perpetually", "indefinite", "in perpetuity", "without limit"],
+    "no sla": ["service level", "uptime", "availability", "sla"],
+}
+
+_STOP_WORDS = {
+    "the", "a", "an", "in", "of", "for", "to", "and", "or", "is", "are", "was",
+    "be", "this", "that", "with", "from", "on", "at", "by", "as", "not", "no",
+    "agreement", "clause", "section", "provision", "risk", "weakness", "improper",
+    "weakness", "exposure", "omission", "termination", "failure",
+}
+
+
+def _extract_topic_words(title: str) -> List[str]:
+    """Extract meaningful topic words from a finding title."""
+    title_lower = title.lower()
+    words = re.findall(r"[a-z][a-z-]+", title_lower)
+    return [w for w in words if w not in _STOP_WORDS and len(w) > 2]
+
+
+def suppress_mismatched_title_findings(issues: List[AuditIssue]) -> List[AuditIssue]:
+    """Suppress findings where the quoted text shares no topic words with the title.
+
+    The model sometimes generates a finding with a title about one legal topic
+    but quoted text about a completely different topic (e.g., title says
+    'Non-Compete Duration' but quoted text is about 'Limitation of Liability').
+    This is a hallucination — the quoted text is real but the finding label is wrong.
+    """
+    if not issues:
+        return issues
+
+    kept = []
+    suppressed_count = 0
+
+    for issue in issues:
+        title = (issue.issue_title or "").lower()
+        qt = (issue.quoted_text or "").lower()
+
+        if not qt or not title:
+            kept.append(issue)
+            continue
+
+        topic_words = _extract_topic_words(title)
+        if not topic_words:
+            kept.append(issue)
+            continue
+
+        qt_tokens = set(re.findall(r"[a-z][a-z-]+", qt))
+
+        matched = False
+        for tw in topic_words:
+            if tw in qt_tokens:
+                matched = True
+                break
+            tw_parts = tw.split("-")
+            for qt_tok in qt_tokens:
+                if qt_tok.startswith(tw) or tw.startswith(qt_tok):
+                    matched = True
+                    break
+                qt_parts = qt_tok.split("-")
+                for tp in tw_parts:
+                    for qp in qt_parts:
+                        if len(tp) > 3 and len(qp) > 3:
+                            if tp.startswith(qp) or qp.startswith(tp):
+                                matched = True
+                                break
+                            min_len = min(len(tp), len(qp))
+                            root_len = max(5, min_len - 2)
+                            if tp[:root_len] == qp[:root_len]:
+                                matched = True
+                                break
+                    if matched:
+                        break
+                if matched:
+                    break
+            if matched:
+                break
+
+        if not matched:
+            suppressed_count += 1
+            logger.info(
+                "[Normalization] Suppressing mismatched title finding — "
+                "title='%s' has no topic overlap with quoted_text. "
+                "quoted_text_preview=%s",
+                issue.issue_title, qt[:80],
+            )
+            continue
+
+        kept.append(issue)
+
+    if suppressed_count:
+        logger.info(
+            "[Normalization] Mismatched title suppressions -> %s",
+            suppressed_count,
+        )
+
+    return kept
+
+
+def rewrite_mislabeled_titles(issues: List[AuditIssue]) -> List[AuditIssue]:
+    """Deterministically rewrite finding titles that are correct in category
+    but wrong in wording, based on quoted_text content.
+
+    Addresses 3 known failure modes:
+    1. Non-solicitation clauses mislabeled as Single-Trigger CoC
+    2. Non-compete clauses mislabeled as Single-Trigger CoC or generic Non-Competition
+    3. Consultant IP retention mislabeled as generic IP Ownership
+    """
+    if not issues:
+        return issues
+
+    rewritten = 0
+    for issue in issues:
+        old_title = issue.issue_title
+        qt = (issue.quoted_text or "").lower()
+        cat = (issue.category or "").lower()
+
+        # Rule 1: Non-solicitation mislabeled as Single-Trigger CoC
+        if old_title == "Single-Trigger Change of Control Acceleration":
+            if "solicit" in qt and "change of control" not in qt:
+                issue.issue_title = "Non-Solicitation Clause in NDA"
+                logger.info(
+                    "[TitleRewrite] old_title=%s new_title=%s rule=non_solicitation_mislabeled_as_coc "
+                    "quoted_text_preview=%s",
+                    old_title, issue.issue_title, qt[:80],
+                )
+                rewritten += 1
+                continue
+
+        # Rule 2: Non-compete mislabeled as Single-Trigger CoC
+        if old_title == "Single-Trigger Change of Control Acceleration":
+            if ("non-compete" in qt or "compete" in qt) and "change of control" not in qt:
+                months_match = re.search(r"(\d+)\s*\)?\s*month", qt)
+                if months_match and int(months_match.group(1)) > 6:
+                    issue.issue_title = "Excessive Non-Compete Duration"
+                    logger.info(
+                        "[TitleRewrite] old_title=%s new_title=%s rule=non_compete_mislabeled_as_coc "
+                        "quoted_text_preview=%s",
+                        old_title, issue.issue_title, qt[:80],
+                    )
+                    rewritten += 1
+                    continue
+
+        # Rule 3: Generic "Non-Competition" with excessive duration
+        if old_title == "Non-Competition":
+            months_match = re.search(r"(\d+)\s*\)?\s*month", qt)
+            if months_match and int(months_match.group(1)) > 6:
+                issue.issue_title = "Excessive Non-Compete Duration"
+                logger.info(
+                    "[TitleRewrite] old_title=%s new_title=%s rule=generic_non_competition "
+                    "quoted_text_preview=%s",
+                    old_title, issue.issue_title, qt[:80],
+                )
+                rewritten += 1
+                continue
+
+        # Rule 4: Generic "IP Ownership" in consultant context
+        if old_title == "Intellectual Property Ownership" and "intellectual property" in cat:
+            if "consultant" in qt and "retain" in qt:
+                issue.issue_title = "Consultant Retains All Deliverable IP"
+                logger.info(
+                    "[TitleRewrite] old_title=%s new_title=%s rule=consultant_ip_retention "
+                    "quoted_text_preview=%s",
+                    old_title, issue.issue_title, qt[:80],
+                )
+                rewritten += 1
+                continue
+
+    if rewritten:
+        logger.info("[TitleRewrite] Total rewrites: %d", rewritten)
+
+    return issues
+
+
+def _apply_document_level_bmi(issues: List[AuditIssue], full_text: str) -> int:
+    """Re-evaluate BMI issues against the full document text.
+
+    When an issue's quoted_text shows mutual indemnity language but lacks
+    cap+exclusion (because those protections are in a separate clause),
+    scan the full document for cap/exclusion patterns. If found, downgrade
+    severity to LOW.
+
+    Returns the number of downgraded issues.
+    """
+    if not issues or not full_text:
+        return 0
+
+    severity_rank = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+    unlimited_pattern = re.compile(r"\b(unlimited|uncapped)\b|no cap|no limit", re.IGNORECASE)
+    cap_pattern = re.compile(
+        r"\b(?:capped at|liability cap|aggregate cap|shall not exceed|shall exceed|"
+        r"must not exceed|may not exceed|limited to|maximum amount|up to|cap of|"
+        r"total fees|fees?\s+paid)\b",
+        re.IGNORECASE
+    )
+    exclusion_pattern = re.compile(
+        r"(?:\b(excluding|exclude|exclusion|waiv|waiver)\b.+\b(indirect|consequential)\b"
+        r"|\bliable\b.*\bfor\b.*\b(?:indirect|consequential)\b"
+        r"|\bno\s+liability\s+for\s+(?:indirect|consequential)\b"
+        r"|\bnot\s+be\s+liable\s+for\b.*\b(?:indirect|consequential)\b)",
+        re.IGNORECASE
+    )
+    mutual_pattern = re.compile(
+        r"\b(?:each party|mutual|both parties|reciprocal)\b.*\bindemnif(?:y|ies)\b",
+        re.IGNORECASE
+    )
+    downgraded = 0
+    for issue in issues:
+        current_sev = issue.severity.strip().upper()
+        if severity_rank.get(current_sev, -1) <= severity_rank["LOW"]:
+            continue  # already low enough
+
+        # Check if this issue has mutual indemnity in its quoted_text
+        has_mutual = bool(mutual_pattern.search(issue.quoted_text or ""))
+        if not has_mutual:
+            continue
+
+        # If quoted_text already has cap+exclusion, the existing BMI rule handles it
+        quoted_has_cap = bool(cap_pattern.search(issue.quoted_text or ""))
+        quoted_has_exclusion = bool(exclusion_pattern.search(issue.quoted_text or ""))
+
+        # Only apply document-level scan when quoted_text is missing protection(s)
+        needs_doc_scan = not (quoted_has_cap and quoted_has_exclusion)
+        if not needs_doc_scan:
+            continue
+
+        # Scan full document for cap and exclusion
+        doc_has_cap = bool(cap_pattern.search(full_text))
+        doc_has_exclusion = bool(exclusion_pattern.search(full_text))
+        doc_has_unlimited = bool(unlimited_pattern.search(full_text))
+
+        if doc_has_cap and doc_has_exclusion and not doc_has_unlimited:
+            issue.severity = "LOW"
+            downgraded += 1
+            logger.info(
+                "[DocumentBMI] Downgraded '%s' to LOW (full-document cap+exclusion found)",
+                issue.issue_title,
+            )
+
+    if downgraded:
+        logger.info("[DocumentBMI] Total downgrades: %d", downgraded)
+    return downgraded
+
+
+def normalize_audit_response(
+    response_text: str,
+    mode: str = "AUDIT",
+    parsed_issues: Optional[List[AuditIssue]] = None,
+    doc_text: str = "",
+) -> tuple[str, List[AuditIssue]]:
+    """Normalize audit output through structured issues and render legacy text.
+
+    Returns: (normalized_text, normalized_issues)
+    When parsed_issues is provided, skips internal parsing.
+    """
+    if mode != "AUDIT":
+        return response_text, []
+
+    if parsed_issues is None:
+        structured_issues = parse_audit_issues(response_text)
+    else:
+        structured_issues = parsed_issues
+
     if not structured_issues:
         normalized_response = normalize_issue_severity(response_text)
-        return normalize_issue_output(normalized_response)
+        return normalize_issue_output(normalized_response), []
 
     structured_issues = normalize_audit_issue_severity_fields(structured_issues)
     structured_issues = normalize_audit_issue_fields(structured_issues)
     structured_issues = suppress_balanced_mutual_indemnity_issues(structured_issues)
-    return render_legacy_audit_text(response_text, structured_issues)
+    structured_issues = suppress_false_sla_findings(structured_issues, doc_text)
+    structured_issues = suppress_mismatched_title_findings(structured_issues)
+    structured_issues = rewrite_mislabeled_titles(structured_issues)
+    return render_legacy_audit_text(response_text, structured_issues), structured_issues
 
 def normalize_issue_severity(response_text: str) -> str:
     """Deterministically enforce severity overrides on parsed issues."""
@@ -1314,18 +1934,34 @@ def normalize_issue_severity(response_text: str) -> str:
             if severity_rank.get(new_severity, -1) > severity_rank["LOW"]:
                 new_severity = "LOW"
 
-        # 6. Broader capped mutual indemnity downgrade (safety net for variants).
+        # 6. Broader capped indemnity / standard limitation of liability downgrade.
         if not bal["is_balanced"] and severity_rank.get(new_severity, -1) >= severity_rank["HIGH"]:
-            has_cap = bool(capped_indemnity_cues.search(quoted))
-            has_indemnity = bool(re.search(r"\b(indemn|indemnify|indemnity|hold harmless)\b", quoted, re.IGNORECASE))
-            has_mutual = bool(re.search(r"\b(each party|mutual|both parties|reciprocal)\b", quoted, re.IGNORECASE))
-            has_exclusion = bool(re.search(
-                r"\b(excluding|exclude|exclusion)\b.+\b(indirect|consequential)\b",
+            has_cap = bool(re.search(
+                r"\b(?:capped at|liability cap|aggregate cap|shall not exceed|shall exceed|"
+                r"must not exceed|may not exceed|limited to|maximum amount|up to|cap of|"
+                r"total fees|fees?\s+paid)\b",
                 quoted, re.IGNORECASE
             ))
-            if has_indemnity and has_cap and has_mutual and has_exclusion:
-                if severity_rank.get(new_severity, -1) > severity_rank["MEDIUM"]:
-                    new_severity = "MEDIUM"
+            has_indemnity = bool(re.search(r"\b(indemn|indemnify|indemnity|hold harmless)\b", quoted, re.IGNORECASE))
+            has_exclusion = bool(re.search(
+                r"(?:\b(excluding|exclude|exclusion|waiv|waiver)\b.+\b(indirect|consequential)\b"
+                r"|\bliable\b.*\bfor\b.*\b(?:indirect|consequential)\b"
+                r"|\bno\s+liability\s+for\s+(?:indirect|consequential)\b"
+                r"|\bnot\s+be\s+liable\s+for\b.*\b(?:indirect|consequential)\b)",
+                quoted, re.IGNORECASE
+            ))
+            has_unlimited_text = bool(unlimited_pattern.search(quoted))
+
+            if not has_unlimited_text:
+                if has_indemnity and has_cap and has_exclusion:
+                    if severity_rank.get(new_severity, -1) > severity_rank["MEDIUM"]:
+                        new_severity = "MEDIUM"
+
+                if not has_indemnity and has_cap and has_exclusion:
+                    has_liability_lang = bool(re.search(r"\b(?:liability|damages|loss|indirect|consequential)\b", quoted, re.IGNORECASE))
+                    if has_liability_lang:
+                        if severity_rank.get(new_severity, -1) > severity_rank["MEDIUM"]:
+                            new_severity = "MEDIUM"
 
         if new_severity != current_severity:
             block = re.sub(
