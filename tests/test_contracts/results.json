@@ -1,0 +1,138 @@
+[
+  {
+    "filename": "TEST-SAAS-01.txt",
+    "contract_type": "SaaS Subscription Agreement",
+    "word_count": 375,
+    "confidence_score": 0.7060000000000001,
+    "confidence_label": "MEDIUM",
+    "parse_ok": true,
+    "issue_count": 2,
+    "issues": [
+      {
+        "issue_title": "No Service Level Agreement",
+        "severity": "MEDIUM",
+        "category": "Enforceability Weakness",
+        "location": "Clause 6: 'SERVICE LEVELS'",
+        "quoted_text": "Provider shall use commercially reasonable efforts to make the Services available at least 99.5% of the time in any calendar month, measured on a 24x7 basis, excluding scheduled maintenance windows.",
+        "risk_explanation": "The absence of an SLA means the customer has no contractual recourse for service interruptions other than termination.",
+        "suggested_improvement": "Include an entire agreement clause to prevent extrinsic claims"
+      },
+      {
+        "issue_title": "Incomplete Confidentiality Exclusions",
+        "severity": "MEDIUM",
+        "category": "Enforceability Weakness",
+        "location": "Clause 5: 'DATA SECURITY'",
+        "quoted_text": "Provider shall implement and maintain commercially reasonable administrative, physical, and technical safeguards to protect Customer Data from unauthorized access, use, or disclosure. Provider shall notify Customer within seventy-two (72) hours of discovering any security breach affecting Customer Data.",
+        "risk_explanation": "The clause does not explicitly list what is NOT covered by the confidentiality obligation, which could lead to ambiguity in its scope.",
+        "suggested_improvement": "Add an explicit exclusion list for what is not covered by the confidentiality obligation."
+      }
+    ]
+  },
+  {
+    "filename": "TEST-CONSULT-02.txt",
+    "contract_type": "Master Services Agreement (Consulting)",
+    "word_count": 390,
+    "confidence_score": 0.691,
+    "confidence_label": "MEDIUM",
+    "parse_ok": true,
+    "issue_count": 2,
+    "issues": [
+      {
+        "issue_title": "Limitation of Liability",
+        "severity": "HIGH",
+        "category": "Liability Exposure",
+        "location": "7. LIMITATION OF LIABILITY",
+        "quoted_text": "CONSULTANT'S TOTAL AGGREGATE LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED THE TOTAL FEES PAID BY CLIENT UNDER THIS AGREEMENT DURING THE TWELVE (12) MONTHS PRECEDING THE CLAIM.",
+        "risk_explanation": "The limitation of liability clause does not include any specific monetary cap or exclusion list, which could result in uncapped exposure for Consultant if the claim exceeds the fees paid by Client during the preceding twelve months. This creates a significant risk of financial loss for Consultant.",
+        "suggested_improvement": "CONSULTANT'S TOTAL AGGREGATE LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED THE MAXIMUM AMOUNT OF $[SPECIFIC_AMOUNT] PAID BY CLIENT UNDER THIS AGREEMENT DURING THE TWELVE (12) MONTHS PRECEDING THE CLAIM."
+      },
+      {
+        "issue_title": "Confidentiality Survival",
+        "severity": "MEDIUM",
+        "category": "Enforceability Weakness",
+        "location": "6. CONFIDENTIALITY",
+        "quoted_text": "The obligations of confidentiality shall survive termination for a period of three (3) years.",
+        "risk_explanation": "The survival clause specifies a duration of three years, which is not considered perpetual in the absence of language like 'perpetual' or 'indefinitely.' However, this finding does not apply to employment confidentiality clauses. The specific duration may still create enforceability weaknesses if it is too short for the intended purpose.",
+        "suggested_improvement": "The obligations of confidentiality shall survive termination and any changes in control for a period of three (3) years."
+      }
+    ]
+  },
+  {
+    "filename": "TEST-LICENSE-03.txt",
+    "contract_type": "Software Licensing Agreement",
+    "word_count": 364,
+    "confidence_score": 0.7060000000000001,
+    "confidence_label": "MEDIUM",
+    "parse_ok": true,
+    "issue_count": 1,
+    "issues": [
+      {
+        "issue_title": "Restrictive Covenants",
+        "severity": "HIGH",
+        "category": "Negotiation Imbalance",
+        "location": "Clause 2",
+        "quoted_text": "(c) modify or create derivative works of the Software;",
+        "risk_explanation": "The clause allows Licensee to modify and create derivative works, which is a significant restriction that could be seen as an overreach in a software licensing agreement. This imbalance creates a fundamental power imbalance favoring Licensee.",
+        "suggested_improvement": "Ensure remedies, warranties, and limitations apply equally to both parties"
+      }
+    ]
+  },
+  {
+    "filename": "TEST-EMPLOY-04.txt",
+    "contract_type": "Employment Agreement",
+    "word_count": 304,
+    "confidence_score": 0.7659999999999999,
+    "confidence_label": "HIGH",
+    "parse_ok": true,
+    "issue_count": 2,
+    "issues": [
+      {
+        "issue_title": "Non-Competition Excessive Duration",
+        "severity": "HIGH",
+        "category": "Enforceability Weakness",
+        "location": "6. INVENTION ASSIGNMENT",
+        "quoted_text": "Employee agrees to assign to the Company all inventions, discoveries, and improvements made during employment that relate to the Company's business.",
+        "risk_explanation": "The non-compete clause lasts for 18 months following termination of employment, which is overbroad and may be unenforceable in jurisdictions with statutory protections like California Labor Code 2870. The clause does not specify a geographic scope, but the State of Washington is included.",
+        "suggested_improvement": "The non-compete should specify a duration no longer than six (6) months and limit the geographic scope to within the State of Washington."
+      },
+      {
+        "issue_title": "Incomplete Confidentiality Exclusions",
+        "severity": "MEDIUM",
+        "category": "Confidentiality Risk",
+        "location": "5. CONFIDENTIALITY",
+        "quoted_text": "Employee agrees to hold in confidence all proprietary and confidential information of the Company. This obligation survives termination of employment.",
+        "risk_explanation": "The confidentiality clause does not contain a dedicated 'Exclusions' or 'Exceptions' section that explicitly lists what is NOT covered by the confidentiality obligation. The absence of an exclusion list means this finding should be applied to all clauses without exclusions, including this one.",
+        "suggested_improvement": "Ensure confidentiality obligations survive termination and continue after contract expiration."
+      }
+    ]
+  },
+  {
+    "filename": "TEST-VENDOR-05.txt",
+    "contract_type": "Vendor Services Agreement",
+    "word_count": 311,
+    "confidence_score": 0.7500000000000001,
+    "confidence_label": "HIGH",
+    "parse_ok": true,
+    "issue_count": 2,
+    "issues": [
+      {
+        "issue_title": "Asymmetric Termination Rights",
+        "severity": "MEDIUM",
+        "category": "Negotiation Imbalance",
+        "location": "Section 9 (TERMINATION FOR CONVENIENCE)",
+        "quoted_text": "Customer may terminate this Agreement for any reason upon ninety (90) days' written notice. Upon termination, Customer shall pay for all services rendered through the termination date.",
+        "risk_explanation": "The clause grants Customer the right to terminate the agreement at any time without cause and requires Customer to pay for services up to the termination date, creating a significant imbalance in negotiation rights.",
+        "suggested_improvement": "Customer may terminate this Agreement with ninety (90) days' written notice upon thirty (30) days' prior written notice of intent to terminate."
+      },
+      {
+        "issue_title": "No Service Level Agreement",
+        "severity": "MEDIUM",
+        "category": "Enforceability Weakness",
+        "location": "Section 4 (SERVICE LEVELS)",
+        "quoted_text": "Vendor shall maintain: (a) order accuracy of at least 99.5%; (b) on-time shipment rate of at least 98%; (c) inventory accuracy of at least 99%",
+        "risk_explanation": "The clause specifies service levels but does not include a Service Level Agreement (SLA), which is necessary for the customer to have contractual recourse in case of service interruptions.",
+        "suggested_improvement": "Include an entire agreement clause to prevent extrinsic claims"
+      }
+    ]
+  }
+]

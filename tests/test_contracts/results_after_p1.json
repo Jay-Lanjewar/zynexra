@@ -1,0 +1,71 @@
+[
+  {
+    "filename": "TEST-SAAS-01.txt",
+    "contract_type": "SaaS Subscription Agreement",
+    "word_count": 375,
+    "confidence_score": 0.0,
+    "confidence_label": "LOW",
+    "parse_ok": false,
+    "issue_count": 0,
+    "issues": []
+  },
+  {
+    "filename": "TEST-CONSULT-02.txt",
+    "contract_type": "Master Services Agreement (Consulting)",
+    "word_count": 390,
+    "confidence_score": 0.6709999999999999,
+    "confidence_label": "MEDIUM",
+    "parse_ok": true,
+    "issue_count": 2,
+    "issues": [
+      {
+        "issue_title": "Limitation of Liability",
+        "severity": "HIGH",
+        "category": "Liability Exposure",
+        "location": "7. LIMITATION OF LIABILITY",
+        "quoted_text": "CONSULTANT'S TOTAL AGGREGATE LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED THE TOTAL FEES PAID BY CLIENT UNDER THIS AGREEMENT DURING THE TWELVE (12) MONTHS PRECEDING THE CLAIM.",
+        "risk_explanation": "The limitation of liability clause does not include a defined monetary cap, which could result in uncapped exposure for Consultant if the claim exceeds the fees paid by Client over the preceding 12 months. This creates significant financial risk and should be addressed to ensure enforceability.",
+        "suggested_improvement": "CONSULTANT'S TOTAL AGGREGATE LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED THE MAXIMUM AMOUNT OF $50,000."
+      },
+      {
+        "issue_title": "Confidentiality Survival",
+        "severity": "MEDIUM",
+        "category": "Enforceability Weakness",
+        "location": "6. CONFIDENTIALITY",
+        "quoted_text": "The obligations of confidentiality shall survive termination for a period of three (3) years.",
+        "risk_explanation": "The survival clause specifies a duration of three years, which is not considered perpetual in the absence of language like 'perpetual' or 'indefinitely.' However, this finding should be reviewed to ensure that no other clauses may extend confidentiality obligations beyond the specified period. The current wording does not create an enforceability weakness.",
+        "suggested_improvement": "The survival clause shall survive termination for a period of three (3) years."
+      }
+    ]
+  },
+  {
+    "filename": "TEST-LICENSE-03.txt",
+    "contract_type": "Software Licensing Agreement",
+    "word_count": 364,
+    "confidence_score": 0.0,
+    "confidence_label": "LOW",
+    "parse_ok": false,
+    "issue_count": 0,
+    "issues": []
+  },
+  {
+    "filename": "TEST-EMPLOY-04.txt",
+    "contract_type": "Employment Agreement",
+    "word_count": 304,
+    "confidence_score": 0.0,
+    "confidence_label": "LOW",
+    "parse_ok": false,
+    "issue_count": 0,
+    "issues": []
+  },
+  {
+    "filename": "TEST-VENDOR-05.txt",
+    "contract_type": "Vendor Services Agreement",
+    "word_count": 311,
+    "confidence_score": 0.0,
+    "confidence_label": "LOW",
+    "parse_ok": false,
+    "issue_count": 0,
+    "issues": []
+  }
+]

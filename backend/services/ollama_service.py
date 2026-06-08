@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import time
 
 from fastapi import HTTPException
@@ -15,8 +15,10 @@ PREVIOUS_GENERATION_OPTIONS = {
 }
 GENERATION_PROFILES = {
     "AUDIT": {
-        # Optimized: reduced budget and context for sub-10s latency.
-        "num_predict": 192,
+        # Benchmarked 2026-06-07: Phase 1 audit responses averaged ~600 tokens
+        # with p95 ~870 tokens, and num_predict=192 caused a 100% retry rate.
+        # 768 avoids most retries while keeping 1024 retry fallback for outliers.
+        "num_predict": 768,
         "temperature": 0.1,
         "num_ctx": 2048,
     },
@@ -33,17 +35,30 @@ GENERATION_PROFILES = {
 }
 MODEL_NAME = settings.MODEL_FAST
 
+AnalysisMetadata = Dict[str, Any]
+
 
 class OllamaService:
-    def generate_response(self, messages: list, model: str, mode: str = "AUDIT") -> tuple[str, bool]:
+    def generate_response(
+        self,
+        messages: list,
+        model: str,
+        mode: str = "AUDIT",
+        document_meta: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[str, bool, AnalysisMetadata]:
+        """Run inference. Returns (response_text, fallback_used, analysis_metadata).
+
+        analysis_metadata is always a dict; if no document_meta was provided
+        (e.g. text-only /ask endpoint), it is returned as {}.
+        """
         try:
-            result = self._generate_with_model(messages, model, mode), False
+            result = self._generate_with_model(messages, model, mode, document_meta) + (False,)
             logger.info("[FallbackTrace] stage=ollama_service_success fallback_used=False")
             return result
         except HTTPException as e:
             if self._should_fallback(e):
                 logger.warning("Model fallback activated. Switching to %s", settings.MODEL_FALLBACK)
-                result = self._generate_with_model(messages, settings.MODEL_FALLBACK, mode), True
+                result = self._generate_with_model(messages, settings.MODEL_FALLBACK, mode, document_meta) + (True,)
                 logger.warning("[FallbackTrace] stage=ollama_service_fallback fallback_used=True")
                 return result
             raise
@@ -114,8 +129,30 @@ class OllamaService:
                 buffer += content
         return buffer, final_chunk
 
-    def _generate_with_model(self, messages: list, model: str, mode: str) -> str:
-        """Generate complete response from a specific model in single pass."""
+    def _generate_with_model(
+        self,
+        messages: list,
+        model: str,
+        mode: str,
+        document_meta: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[str, AnalysisMetadata]:
+        """Generate complete response from a specific model in single pass.
+
+        Returns (response_text, analysis_metadata). analysis_metadata always
+        contains a stable shape:
+
+            {
+                "was_truncated": bool,
+                "kept_chars": int,
+                "dropped_chars": int,
+                "context_utilization_pct": float,
+                "pages_seen": int | None,
+            }
+
+        When document_meta is None (e.g. text-only /ask endpoint), pages_seen
+        is None and the *_chars fields reflect the user-message length sent
+        to the model (which has no separate document-source notion).
+        """
         inference_start = None
         profile_name, generation_options = self._get_generation_options(mode)
         if profile_name == "AUDIT":
@@ -128,6 +165,18 @@ class OllamaService:
         estimated_tokens = self._estimate_prompt_tokens(messages)
         current_ctx = generation_options.get("num_ctx", 2048)
 
+        # Track the user-message length before any truncation. This becomes
+        # the "kept_chars" baseline; if overflow truncation fires, the actual
+        # post-truncation length is used instead.
+        original_user_chars = 0
+        for msg in messages:
+            if msg.get("role") == "user":
+                original_user_chars = len(str(msg.get("content", "")))
+                break
+
+        was_truncated = False
+        post_truncation_user_chars = original_user_chars
+
         if estimated_tokens > MAX_CONTEXT_WINDOW:
             overflow_tokens = estimated_tokens - MAX_CONTEXT_WINDOW
             overflow_chars = overflow_tokens * 4
@@ -137,6 +186,9 @@ class OllamaService:
                     content = str(msg.get("content", ""))
                     keep_chars = max(len(content) - overflow_chars, 0)
                     messages[i] = {**msg, "content": content[:keep_chars]}
+                    post_truncation_user_chars = keep_chars
+                    if keep_chars < len(content):
+                        was_truncated = True
                     logger.warning(
                         "[ContextOverflow] estimated_prompt_tokens=%d max_ctx=%d "
                         "overflow_tokens=%d overflow_chars=%d "
@@ -200,7 +252,29 @@ class OllamaService:
                     else:
                         buffer = f"{retry_buffer.rstrip()}\n\n...response truncated"
 
-            return buffer
+            # Build analysis_metadata. dropped_chars is measured against the
+            # original user-message length, not the document-source length
+            # (which is not separately tracked here for the /ask path).
+            pages_seen: Optional[int] = None
+            if document_meta and "pages_seen" in document_meta:
+                pages_seen = document_meta.get("pages_seen")
+            analysis_metadata: AnalysisMetadata = {
+                "was_truncated": was_truncated,
+                "kept_chars": post_truncation_user_chars,
+                "dropped_chars": max(0, original_user_chars - post_truncation_user_chars),
+                "context_utilization_pct": ctx_util_pct,
+                "pages_seen": pages_seen,
+            }
+            logger.info(
+                "[AnalysisMetadata] was_truncated=%s kept_chars=%d dropped_chars=%d "
+                "context_utilization_pct=%.1f pages_seen=%s",
+                analysis_metadata["was_truncated"],
+                analysis_metadata["kept_chars"],
+                analysis_metadata["dropped_chars"],
+                analysis_metadata["context_utilization_pct"],
+                analysis_metadata["pages_seen"],
+            )
+            return buffer, analysis_metadata
 
         except HTTPException:
             # Re-raise HTTP exceptions as-is

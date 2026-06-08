@@ -33,6 +33,15 @@ export type ConfidenceMetadata = {
   model_name?: string;
   inference_duration_ms?: number;
   parser_used?: string;
+  analysis_metadata?: AnalysisMetadata;
+};
+
+export type AnalysisMetadata = {
+  was_truncated: boolean;
+  kept_chars: number;
+  dropped_chars: number;
+  context_utilization_pct: number;
+  pages_seen: number | null;
 };
 
 export type AuditIssue = {

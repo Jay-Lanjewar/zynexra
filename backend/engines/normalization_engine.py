@@ -530,6 +530,7 @@ def build_audit_json_payload(
     fallback_used: bool = False,
     inference_duration_ms: float = 0,
     parsed_issues: Optional[List[AuditIssue]] = None,
+    analysis_metadata: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build a machine-readable audit response with single-pass processing.
 
@@ -757,6 +758,9 @@ def build_audit_json_payload(
         "semantic_suppressed": semantic_suppressed,
     }
 
+    if analysis_metadata:
+        metadata["analysis_metadata"] = analysis_metadata
+
     if domain_metadata:
         metadata.update(domain_metadata)
 
@@ -836,6 +840,7 @@ def build_mode_json_payload(
     fallback_used: bool = False,
     inference_duration_ms: float = 0,
     parsed_issues: Optional[List[AuditIssue]] = None,
+    analysis_metadata: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build mode-aware JSON while preserving legacy text compatibility."""
     logger.info("[FallbackTrace] stage=build_mode_json_payload_entry fallback_used=%s mode=%s", fallback_used, mode)
@@ -847,6 +852,7 @@ def build_mode_json_payload(
             fallback_used=fallback_used,
             inference_duration_ms=inference_duration_ms,
             parsed_issues=parsed_issues,
+            analysis_metadata=analysis_metadata,
         )
 
     if normalized_mode == "ADVISORY":

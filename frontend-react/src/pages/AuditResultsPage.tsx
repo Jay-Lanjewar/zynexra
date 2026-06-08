@@ -1,10 +1,10 @@
-import { ArrowLeft, AlertCircle, AlertTriangle, CheckCircle2, Eraser, FileSearch, MessageSquareText, ShieldCheck, ListChecks, ShieldAlert } from "lucide-react";
+import { ArrowLeft, AlertCircle, AlertTriangle, CheckCircle2, Eraser, FileSearch, MessageSquareText, ShieldCheck, ListChecks, ShieldAlert, FileWarning } from "lucide-react";
 import { CollapsibleIssueCard } from "../components/CollapsibleIssueCard";
 import { ExportButtons } from "../components/ExportButtons";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
 import { ConfidenceBadge } from "../components/ConfidenceBadge";
-import type { AuditResponse } from "../types";
+import type { AnalysisMetadata, AuditResponse } from "../types";
 import type { ApiError } from "../api";
 import { groupIssuesByCategory, getSeverityCounts } from "../utils";
 
@@ -210,15 +210,22 @@ function RiskLevelBadge({ level }: { level: RiskLevel }) {
   );
 }
 
-function AuditSummary({ issues, riskLevel, confidenceLabel, confidenceScore, inferenceDurationMs }: {
+function AuditSummary({ issues, riskLevel, confidenceLabel, confidenceScore, inferenceDurationMs, analysis }: {
   issues: AuditResponse["issues"];
   riskLevel: RiskLevel;
   confidenceLabel?: string;
   confidenceScore?: number;
   inferenceDurationMs?: number;
+  analysis?: AnalysisMetadata;
 }) {
   const oneLiner = generateOneLineSummary(issues, riskLevel);
   const duration = inferenceDurationMs ? (inferenceDurationMs / 1000).toFixed(1) : null;
+
+  const totalInput = analysis ? analysis.kept_chars + analysis.dropped_chars : 0;
+  const analyzedPct =
+    analysis && totalInput > 0
+      ? Math.max(0, Math.min(100, Math.round((analysis.kept_chars / totalInput) * 100)))
+      : null;
 
   return (
     <section
@@ -261,6 +268,14 @@ function AuditSummary({ issues, riskLevel, confidenceLabel, confidenceScore, inf
                   <span className="font-medium text-slate-400">Analyzed in {duration}s</span>
                 </>
               )}
+              {analyzedPct !== null && (
+                <>
+                  <span className="text-slate-600">·</span>
+                  <span className={`font-medium ${analysis?.was_truncated ? "text-amber-400" : "text-slate-400"}`}>
+                    {analyzedPct}% of document analysed
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -274,6 +289,79 @@ function AuditSummary({ issues, riskLevel, confidenceLabel, confidenceScore, inf
       </div>
     </section>
   );
+}
+
+function formatNumber(n: number): string {
+  return n.toLocaleString("en-US");
+}
+
+function TruncationBanner({ analysis }: { analysis: AnalysisMetadata | undefined }) {
+  if (!analysis) return null;
+
+  const totalInput = analysis.kept_chars + analysis.dropped_chars;
+  const analyzedPct =
+    totalInput > 0
+      ? Math.max(0, Math.min(100, Math.round((analysis.kept_chars / totalInput) * 100)))
+      : 100;
+
+  if (analysis.was_truncated) {
+    return (
+      <section
+        role="alert"
+        aria-label="Document was truncated before analysis"
+        className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4"
+      >
+        <div className="flex items-start gap-3">
+          <FileWarning className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold text-amber-300">
+              Only part of this document was analysed
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-amber-400/90">
+              The document exceeded the model&apos;s context window. The audit ran on{" "}
+              <span className="font-semibold text-amber-300">{analyzedPct}%</span> of the
+              source ({formatNumber(analysis.kept_chars)} of{" "}
+              {formatNumber(totalInput)} characters kept;{" "}
+              {formatNumber(analysis.dropped_chars)} characters omitted).
+              {analysis.pages_seen !== null && analysis.pages_seen !== undefined && (
+                <>
+                  {" "}Pages seen: <span className="font-semibold text-amber-300">{analysis.pages_seen}</span>.
+                </>
+              )}
+            </p>
+            <p className="mt-1 text-xs text-amber-400/70">
+              Findings may not reflect clauses in the omitted portion. Consider re-uploading a
+              shorter excerpt or splitting the document.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (totalInput > 0 && analysis.context_utilization_pct >= 85) {
+    return (
+      <section
+        role="status"
+        aria-label="Document nearly filled the model context"
+        className="mt-4 rounded-xl border border-slate-700 bg-slate-900/60 p-4"
+      >
+        <div className="flex items-start gap-3">
+          <FileWarning className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />
+          <div className="min-w-0 flex-1 text-sm text-slate-300">
+            <span className="font-semibold">Document used {analysis.context_utilization_pct.toFixed(1)}%</span> of the model
+            context window. No content was dropped on this run, but smaller documents are
+            analysed with more headroom.
+            {analysis.pages_seen !== null && analysis.pages_seen !== undefined && (
+              <> Pages seen: <span className="font-semibold text-slate-200">{analysis.pages_seen}</span>.</>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return null;
 }
 
 function KeyFindingsPanel({ issues }: { issues: AuditResponse["issues"] }) {
@@ -372,12 +460,14 @@ export function AuditResultsPage({ result, error, onReset }: AuditResultsPagePro
 
       {isAuditMode && !result.structured_parse_failed && (
         <div className="mt-6 space-y-4">
+          <TruncationBanner analysis={result.metadata?.analysis_metadata} />
           <AuditSummary
             issues={result.issues}
             riskLevel={riskLevel ?? "SAFE"}
             confidenceLabel={confidenceLabel}
             confidenceScore={confidenceScore}
             inferenceDurationMs={result.metadata?.inference_duration_ms}
+            analysis={result.metadata?.analysis_metadata}
           />
           <KeyFindingsPanel issues={result.issues} />
         </div>

@@ -42,8 +42,8 @@ from backend.engines.legal_domain_engine import (
 )
 from backend.logger import logger
 from backend.prompts import build_execution_prompt
-from backend.services.pdf_service import extract_text_from_pdf
-from backend.services.docx_service import extract_text_from_docx
+from backend.services.pdf_service import extract_text_from_pdf, extract_text_from_pdf_with_stats
+from backend.services.docx_service import extract_text_from_docx, extract_text_from_docx_with_stats
 from backend.utils.timing import log_timing
 
 MODEL_NAME = settings.MODEL_FAST
@@ -349,7 +349,7 @@ def ask(q: Query, response_format: Optional[str] = None):
     if json_response_mode:
         inference_start = time.time()
         try:
-            raw_response, fallback_used = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
+            raw_response, fallback_used, _analysis_metadata = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
             inference_duration_ms = (time.time() - inference_start) * 1000
             logger.info("[Perf] inference_ms=%.0f", inference_duration_ms)
             logger.info("[FallbackTrace] stage=app_json_response_handoff fallback_used=%s", fallback_used)
@@ -441,7 +441,7 @@ def ask(q: Query, response_format: Optional[str] = None):
         # Always try fast model first. ResponseGenerator handles fallback internally.
         try:
             inference_start = time.time()
-            raw_response, fallback_used = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
+            raw_response, fallback_used, _analysis_metadata = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
             inference_duration_ms = (time.time() - inference_start) * 1000
             logger.info("[Perf] inference_ms=%.0f", inference_duration_ms)
             logger.info("[FallbackTrace] stage=app_streaming_response_handoff fallback_used=%s", fallback_used)
@@ -601,10 +601,11 @@ def ask_file(
             raise HTTPException(400, "File exceeds maximum size. TXT files must be under 2MB.")
 
         extraction_start = time.time()
+        pages_seen: Optional[int] = None
         if filename.endswith(".pdf"):
-            text = extract_text_from_pdf(content)
+            text, pages_seen = extract_text_from_pdf_with_stats(content)
         elif filename.endswith(".docx"):
-            text = extract_text_from_docx(content)
+            text, pages_seen = extract_text_from_docx_with_stats(content)
         else:
             # Default to .txt processing
             try:
@@ -842,10 +843,11 @@ def ask_file(
         inference_start = time.time()
 
         try:
-            raw_response, fallback_used = response_generator.generate_response(
+            raw_response, fallback_used, analysis_metadata = response_generator.generate_response(
                 messages,
                 settings.MODEL_FAST,
-                effective_mode
+                effective_mode,
+                document_meta={"pages_seen": pages_seen},
             )
         except Exception as e:
             logger.exception("MODEL GENERATION FAILED")
@@ -895,7 +897,7 @@ def ask_file(
         session["last_report"] = complete_response
 
         if json_response_mode:
-            structured = build_mode_json_payload(complete_response, MODEL_NAME, effective_mode, user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms, parsed_issues=normalized_issues)
+            structured = build_mode_json_payload(complete_response, MODEL_NAME, effective_mode, user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms, parsed_issues=normalized_issues, analysis_metadata=analysis_metadata)
             if fallback_used:
                 structured["fallback_used"] = True
                 if "metadata" in structured:
