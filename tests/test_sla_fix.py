@@ -266,7 +266,7 @@ def test_suppress_false_sla_case_insensitive():
 
 
 def test_no_suppress_when_no_sla_keywords():
-    """Finding should NOT be suppressed when contract has no SLA keywords."""
+    """SaaS finding should NOT be suppressed when SaaS contract has no SLA keywords."""
     issues = [
         AuditIssue(
             issue_title="No Service Level Agreement",
@@ -275,7 +275,8 @@ def test_no_suppress_when_no_sla_keywords():
             quoted_text="No performance targets defined.",
         )
     ]
-    doc_text = "This agreement is about software licensing. No performance targets are defined."
+    # SaaS/cloud document without SLA keywords — finding is valid, must not be suppressed
+    doc_text = "This SaaS subscription agreement covers cloud platform access. No performance targets are defined."
     result = suppress_false_sla_findings(issues, doc_text)
     assert len(result) == 1, f"Expected 1 issue (no suppression), got {len(result)}"
 

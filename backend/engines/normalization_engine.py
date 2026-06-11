@@ -580,6 +580,11 @@ def build_audit_json_payload(
         # Fix 5: Asymmetry detection (one-sided indemnification)
         _apply_asymmetry_detection(issues, user_input)
 
+        # Fix 6: False 'Incomplete Confidentiality Exclusions' suppression
+        issues, incomplete_exclusion_suppressions = suppress_false_incomplete_confidentiality_exclusions(
+            issues, user_input
+        )
+
     if not parse_failed:
         contradictions = validate_contradictions(issues, user_input)
         if contradictions:
@@ -1550,31 +1555,60 @@ _SLA_NEGATIVE_PATTERNS = [
     "no guarantee", "not warrant", "as is", "as-available",
 ]
 
+_SAAS_CLOUD_KEYWORDS = [
+    "saas", "software-as-a-service", "software as a service",
+    "subscription", "cloud", "platform", "service provider",
+    "service levels", "uptime", "availability", "service credit",
+    "service credits", "downtime", "sla",
+]
+
 
 def suppress_false_sla_findings(issues: List[AuditIssue], doc_text: str = "") -> List[AuditIssue]:
-    """Suppress 'No Service Level Agreement' findings when the contract contains SLA keywords.
-    
-    The model sometimes generates 'No SLA' findings even when the contract explicitly
-    contains SLA commitments (e.g., '99.5% uptime', 'service levels'). This function
-    checks the contract text for SLA-related keywords and suppresses false findings.
-    
-    Does NOT suppress if the contract explicitly says "no SLA" or "does not guarantee".
+    """Suppress 'No Service Level Agreement' findings when the contract is not
+    SaaS/cloud or already contains SLA language.
+
+    Three suppression paths:
+    1. Document lacks SaaS/cloud signals → SLA finding is a category mismatch.
+    2. Document contains SLA keywords → SLA already exists, finding is false.
+    3. Negative patterns (e.g. 'no SLA', 'as is') → contract explicitly disclaims,
+       finding is valid → do NOT suppress.
     """
     if not doc_text:
         return issues
-    
+
     text_lower = doc_text.lower()
-    
-    # Check for negative patterns — if present, the contract explicitly disclaims SLA
+
+    # Negative patterns: contract explicitly disclaims SLA — keep the finding
     has_negative = any(p in text_lower for p in _SLA_NEGATIVE_PATTERNS)
     if has_negative:
         return issues
-    
+
+    # Document-type gate: if not a SaaS/cloud document, an SLA finding is
+    # a category mismatch and must be suppressed.
+    has_saas_cloud = any(kw in text_lower for kw in _SAAS_CLOUD_KEYWORDS)
+    if not has_saas_cloud:
+        kept = []
+        suppressed_count = 0
+        for issue in issues:
+            title = (issue.issue_title or "").lower()
+            if "no service level agreement" in title or "no sla" in title:
+                suppressed_count += 1
+                logger.info(
+                    "[Normalization] Suppressing 'No SLA' finding — document is not "
+                    "SaaS/cloud. quoted_text_preview=%s",
+                    (issue.quoted_text or "")[:80],
+                )
+                continue
+            kept.append(issue)
+        if suppressed_count:
+            logger.info("[Normalization] Non-SaaS 'No SLA' suppressions -> %s", suppressed_count)
+        return kept
+
+    # SaaS/cloud document: suppress only if SLA language already exists
     has_sla_keywords = any(kw in text_lower for kw in _SLA_KEYWORDS)
-    
     if not has_sla_keywords:
         return issues
-    
+
     kept = []
     suppressed_count = 0
     for issue in issues:
@@ -1582,17 +1616,113 @@ def suppress_false_sla_findings(issues: List[AuditIssue], doc_text: str = "") ->
         if "no service level agreement" in title or "no sla" in title:
             suppressed_count += 1
             logger.info(
-                "[Normalization] Suppressing false 'No SLA' finding — contract contains SLA keywords. "
-                "quoted_text_preview=%s",
+                "[Normalization] Suppressing false 'No SLA' finding — contract contains "
+                "SLA keywords. quoted_text_preview=%s",
                 (issue.quoted_text or "")[:80],
             )
             continue
         kept.append(issue)
-    
+
     if suppressed_count:
         logger.info("[Normalization] False SLA suppressions -> %s", suppressed_count)
-    
+
     return kept
+
+
+_INCOMPLETE_EXCLUSION_TITLE_RE = re.compile(
+    r"incomplete.*confidential.*exclusion|confidential.*exclusion.*incomplete",
+    re.IGNORECASE,
+)
+
+_INCOMPLETE_EXCLUSION_CATEGORY_PATTERNS: Dict[str, re.Pattern] = {
+    "publicly_available": re.compile(
+        r"(?:publicly\s+(?:available|known|accessible|disclosed)"
+        r"|public\s+domain"
+        r"|becomes?\s+(?:public|generally\s+available)"
+        r"|generally\s+available\s+to\s+the\s+public"
+        r"|available\s+through\s+no\s+breach"
+        r"|publicly\s+known\s+through\s+no\s+breach)",
+        re.IGNORECASE,
+    ),
+    "prior_possession": re.compile(
+        r"(?:prior\s+(?:possession|to\s+disclosure|knowledge)"
+        r"|rightfully\s+in.*?(?:possession|knowledge)"
+        r"|lawfully\s+obtained"
+        r"|known\s+(?:prior|before)\s+to\s+disclosure"
+        r"|was\s+in.*?possession\s+prior"
+        r"|rightfully\s+in\s+receiving\s+party.*?possession"
+        r"|was\s+rightfully\s+in.*?possession"
+        r"|was\s+(?:in\s+)?(?:the\s+)?(?:recipient|receiving\s+party|counterparty).*?possession)",
+        re.IGNORECASE,
+    ),
+    "independent_development": re.compile(
+        r"(?:independently\s+developed"
+        r"|independent\s+development"
+        r"|developed\s+(?:independently|without\s+(?:use\s+of|reference\s+to)))",
+        re.IGNORECASE,
+    ),
+    "third_party_receipt": re.compile(
+        r"(?:third[\s-]party\s+(?:receipt|receiv|obtain|source)"
+        r"|rightfully\s+(?:received|obtained)\s+from\s+(?:a\s+)?third"
+        r"|received\s+from\s+(?:a\s+)?third\s+party"
+        r"|obtained\s+from\s+(?:a\s+)?third\s+party"
+        r"|from\s+a\s+third\s+party\s+without"
+        r"|third[\s-]party\s+source)",
+        re.IGNORECASE,
+    ),
+}
+
+
+def suppress_false_incomplete_confidentiality_exclusions(
+    issues: List[AuditIssue], doc_text: str = ""
+) -> tuple[List[AuditIssue], List[dict]]:
+    """Suppress 'Incomplete Confidentiality Exclusions' findings when the document
+    (or quoted text as fallback) actually contains all four standard exclusion categories.
+
+    Returns (filtered_issues, suppression_log).
+    """
+    if not issues:
+        return [], []
+
+    kept: List[AuditIssue] = []
+    suppression_log: List[dict] = []
+
+    for issue in issues:
+        title = (issue.issue_title or "").strip()
+        if not _INCOMPLETE_EXCLUSION_TITLE_RE.search(title):
+            kept.append(issue)
+            continue
+
+        search_text = doc_text if doc_text and len(doc_text) > 100 else (issue.quoted_text or "")
+
+        matched_categories: List[str] = []
+        for cat_name, pattern in _INCOMPLETE_EXCLUSION_CATEGORY_PATTERNS.items():
+            if pattern.search(search_text):
+                matched_categories.append(cat_name)
+
+        if len(matched_categories) >= 4:
+            suppression_log.append({
+                "issue_title": title,
+                "severity": issue.severity,
+                "category": issue.category,
+                "quoted_text_preview": (issue.quoted_text or "")[:120],
+                "matched_categories": matched_categories,
+                "suppression_reason": (
+                    "All 4 standard exclusion categories found in "
+                    + ("document text" if doc_text and len(doc_text) > 100 else "quoted text")
+                ),
+                "search_source": "doc_text" if doc_text and len(doc_text) > 100 else "quoted_text",
+            })
+            logger.info(
+                "[IncompleteExclusionSuppression] Suppressing '%s' — "
+                "all 4 categories matched: %s",
+                title, matched_categories,
+            )
+            continue
+
+        kept.append(issue)
+
+    return kept, suppression_log
 
 
 _TITLE_TOPIC_WORDS: Dict[str, List[str]] = {
@@ -1881,6 +2011,7 @@ def normalize_audit_response(
     structured_issues = suppress_false_sla_findings(structured_issues, doc_text)
     structured_issues = suppress_mismatched_title_findings(structured_issues)
     structured_issues = rewrite_mislabeled_titles(structured_issues)
+    structured_issues, _ = suppress_false_incomplete_confidentiality_exclusions(structured_issues, doc_text)
     return render_legacy_audit_text(response_text, structured_issues), structured_issues
 
 def normalize_issue_severity(response_text: str) -> str:
