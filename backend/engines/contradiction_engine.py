@@ -58,6 +58,53 @@ DURATION_INSUFFICIENCY_CUES = [
     re.compile(r"(?i)\b(?:continues\s+(?:indefinitely|forever|perpetually)|no\s+end\s+to\s+obligations)"),
 ]
 
+FINITE_DURATION_PATTERNS = [
+    re.compile(r"(?i)for\s+a\s+period\s+of\s+\w+\s*\(\d+\)\s*years?"),
+    re.compile(r"(?i)for\s+a\s+period\s+of\s+\d+\s*years?"),
+    re.compile(r"(?i)\w+\s*\(\d+\)\s*years?"),
+    re.compile(r"(?i)\d+\s*\(\w+\)\s*years?"),
+    re.compile(r"(?i)\d+\s+years?"),
+    re.compile(r"(?i)for\s+\d+\s+years?"),
+    re.compile(r"(?i)lasts?\s+for\s+\d+\s*years?"),
+    re.compile(r"(?i)lasts?\s+for\s+\w+\s*\(\d+\)\s*years?"),
+]
+
+PERPETUAL_OR_INDEFINITE_PATTERNS = [
+    re.compile(r"(?i)\bperpetual\b"),
+    re.compile(r"(?i)\bindefinite\b"),
+    re.compile(r"(?i)\bwithout\s+limit\b"),
+    re.compile(r"(?i)\bpermanently\b"),
+    re.compile(r"(?i)\bin\s+perpetuity\b"),
+    re.compile(r"(?i)\bindefinitely\b"),
+]
+
+
+def _has_finite_duration(text: str) -> bool:
+    if not text:
+        return False
+    return any(pattern.search(text) for pattern in FINITE_DURATION_PATTERNS)
+
+
+def _has_perpetual_or_indefinite(text: str) -> bool:
+    if not text:
+        return False
+    return any(pattern.search(text) for pattern in PERPETUAL_OR_INDEFINITE_PATTERNS)
+
+
+def _check_finite_duration_contradiction(
+    issue_title: str, quoted_text: str, risk_explanation: str
+) -> bool:
+    if not quoted_text:
+        return False
+    if not _has_finite_duration(quoted_text):
+        return False
+    if _has_perpetual_or_indefinite(issue_title):
+        return True
+    if _has_perpetual_or_indefinite(risk_explanation):
+        return True
+    return False
+
+
 OBLIGATION_DOMAIN_PATTERNS = [
     re.compile(r"(?i)\bconfidential"),
     re.compile(r"(?i)\bproprietary"),
@@ -294,6 +341,31 @@ def validate_contradictions(issues: list, document_text: str = "") -> List[Contr
             results.append(result)
             logger.warning(
                 "[ContradictionSuppression] suppressed_reason=semantic_mismatch issue=%d",
+                idx
+            )
+            continue
+
+        if _check_finite_duration_contradiction(issue.issue_title, quoted, risk):
+            if is_document_level:
+                logger.info(
+                    "[ContradictionDetection] finite_duration_contradiction detected issue=%d "
+                    "but document_level_conflict=True - NOT suppressing",
+                    idx
+                )
+                continue
+
+            result = ContradictionResult(
+                has_contradiction=True,
+                issue_index=idx,
+                contradiction_type="finite_duration_contradiction",
+                quoted_text=quoted,
+                category=category,
+                risk_explanation=risk,
+                reason=f"Quoted text contains explicit finite duration, but issue title or risk explanation claims perpetual/indefinite survival.",
+            )
+            results.append(result)
+            logger.warning(
+                "[ContradictionSuppression] suppressed_reason=finite_duration_contradiction issue=%d",
                 idx
             )
             continue
