@@ -192,7 +192,7 @@ def _check_semantic_contradiction(quoted_text: str, risk_explanation: str) -> bo
         r"(?i)\b(?:missing|absent|lacks?|no\s+(?:survival|provision|clause)|omitted|not\s+found|not\s+present|does\s+not\s+(?:exist|appear|state|specify))\b"
     )
     termination_indicators = re.compile(
-        r"(?i)\b(?:terminate|termination|end|expire|expiration|cease|dissolve)\b"
+        r"(?i)\b(?:terminate|termination|expire|expiration|cease|dissolve)\b"
     )
 
     has_missing = bool(missing_indicators.search(risk_explanation))
