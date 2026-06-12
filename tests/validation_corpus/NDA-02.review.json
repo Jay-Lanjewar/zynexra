@@ -16,9 +16,9 @@
         "allowed_severities": ["LOW", "MEDIUM"],
         "expected_category": "Enforceability Weakness",
         "allowed_categories": ["Enforceability Weakness", "Confidentiality Risk", "Confidentiality"],
-        "must_contain_quoted_text_pattern": ["Independent development", "third party", "prior knowledge", "publicly available"],
+        "must_contain_quoted_text_pattern": ["publicly available"],
         "must_not_contain_quoted_text_pattern": [],
-        "must_contain_explanation_pattern": ["exclusion", "confidential"],
+        "must_contain_explanation_pattern": ["Independent development", "third party", "exclusion", "confidential"],
         "must_not_contain_explanation_pattern": [],
         "rationale": "NDA-02 has only 2 standard exclusions (public availability and prior knowledge), missing independent development and third-party receipt. This creates an asymmetric risk for the receiving party. Standard NDA suppression may cap to LOW if categorized as confidentiality risk."
       }
