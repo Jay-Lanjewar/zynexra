@@ -496,12 +496,31 @@ def compute_corpus_metrics(results: list) -> dict:
 # 5. Main
 # ---------------------------------------------------------------------------
 
+WARMUP_DOC = "NDA-01"
+
+
+def warmup_inference() -> None:
+    """Run one warm-up inference to eliminate GPU cold-start variance."""
+    doc_path = CORPUS_DIR / f"{WARMUP_DOC}.txt"
+    if not doc_path.exists():
+        return
+    print(f"  Warming up model (sending {WARMUP_DOC})...")
+    try:
+        result = send_document(doc_path)
+        n = len(result.get("issues", []))
+        print(f"  Warm-up done ({n} issues, parse_ok={not result.get('structured_parse_failed', False)}).")
+    except Exception:
+        print("  Warm-up failed (continuing anyway).")
+
+
 def main():
     print("=" * 72)
     print("  ZYNEXRA — PHASE 1 VALIDATION SUITE")
     print(f"  Target: {BASE_URL}")
     print(f"  Time:   {time.strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 72)
+
+    warmup_inference()
 
     # Load document order
     doc_ids = [

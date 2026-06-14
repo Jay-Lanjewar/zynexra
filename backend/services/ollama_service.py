@@ -19,8 +19,9 @@ GENERATION_PROFILES = {
         # with p95 ~870 tokens, and num_predict=192 caused a 100% retry rate.
         # 768 avoids most retries while keeping 1024 retry fallback for outliers.
         "num_predict": 768,
-        "temperature": 0.1,
+        "temperature": 0,
         "num_ctx": 2048,
+        "seed": 42,
     },
     "REDACTION": {
         "num_predict": 768,
