@@ -585,6 +585,21 @@ def build_audit_json_payload(
             issues, user_input
         )
 
+        # Fix 7: False 'Excessive Non-Compete Duration' suppression
+        issues, excessive_noncompete_suppressions = suppress_false_excessive_noncompete_findings(
+            issues, user_input
+        )
+
+        # Fix 8: False 'Overbroad Invention Assignment' suppression
+        issues, invention_assignment_suppressions = suppress_false_overbroad_invention_assignment_findings(
+            issues, user_input
+        )
+
+        # Fix 9: False ICE wrong-section suppression
+        issues, ice_wrong_section_suppressions = suppress_false_ice_wrong_section(
+            issues, user_input
+        )
+
     if not parse_failed:
         contradictions = validate_contradictions(issues, user_input)
         if contradictions:
@@ -1725,6 +1740,195 @@ def suppress_false_incomplete_confidentiality_exclusions(
     return kept, suppression_log
 
 
+_NONCOMPETE_DURATION_RE = re.compile(r"(\d+)\s*\)?\s*month", re.IGNORECASE)
+
+
+def suppress_false_excessive_noncompete_findings(
+    issues: List[AuditIssue], doc_text: str = ""
+) -> tuple[List[AuditIssue], List[dict]]:
+    """Suppress 'Excessive Non-Compete Duration' findings where the
+    quoted duration is <= 6 months (within acceptable threshold).
+
+    Returns (filtered_issues, suppression_log).
+    """
+    if not issues:
+        return [], []
+
+    kept: List[AuditIssue] = []
+    suppression_log: List[dict] = []
+
+    for issue in issues:
+        title = (issue.issue_title or "").strip()
+        if title != "Excessive Non-Compete Duration":
+            kept.append(issue)
+            continue
+
+        qt = issue.quoted_text or ""
+        m = _NONCOMPETE_DURATION_RE.search(qt)
+        if not m:
+            kept.append(issue)
+            continue
+
+        duration = int(m.group(1))
+        if duration <= 6:
+            suppression_log.append({
+                "issue_title": title,
+                "severity": issue.severity,
+                "category": issue.category,
+                "quoted_text_preview": qt[:120],
+                "extracted_duration_months": duration,
+                "suppression_reason": "Non-compete duration <= 6 months (within acceptable threshold)",
+            })
+            logger.info(
+                "[NonCompeteSuppression] Suppressing '%s' "
+                "duration=%d months, threshold=<=6",
+                title, duration,
+            )
+            continue
+
+        kept.append(issue)
+
+    return kept, suppression_log
+
+
+_INVENTION_CARVEOUT_RE = re.compile(
+    r"develops entirely on .*? own time",
+    re.IGNORECASE | re.DOTALL
+)
+
+
+def suppress_false_overbroad_invention_assignment_findings(
+    issues: List[AuditIssue], doc_text: str = ""
+) -> tuple[List[AuditIssue], List[dict]]:
+    """Suppress 'Overbroad Invention Assignment' findings where the quoted
+    clause contains a carve-out for inventions developed on the employee's
+    own time and unrelated to the company's business (e.g. CA Labor Code
+    § 2870 language).
+
+    Returns (filtered_issues, suppression_log).
+    """
+    if not issues:
+        return [], []
+
+    kept: List[AuditIssue] = []
+    suppression_log: List[dict] = []
+
+    for issue in issues:
+        title = (issue.issue_title or "").strip()
+        if title != "Overbroad Invention Assignment":
+            kept.append(issue)
+            continue
+
+        qt = issue.quoted_text or ""
+        if not _INVENTION_CARVEOUT_RE.search(qt):
+            kept.append(issue)
+            continue
+
+        suppression_log.append({
+            "issue_title": title,
+            "severity": issue.severity,
+            "category": issue.category,
+            "quoted_text_preview": qt[:120],
+            "suppression_reason": "Invention assignment clause contains own-time carve-out (not overbroad)",
+        })
+        logger.info(
+            "[InventionAssignmentSuppression] Suppressing '%s' "
+            "— quoted text contains own-time carve-out",
+            title,
+        )
+        continue
+
+    return kept, suppression_log
+
+
+_INCOMPLETE_EXCLUSION_TITLE_RE = re.compile(
+    r"incomplete.*confidential.*exclusion"
+    r"|confidential.*exclusion.*incomplete",
+    re.IGNORECASE,
+)
+
+_OBLIGATION_QT_SIGNALS = re.compile(
+    r"(?:"
+    r"shall\s+hold"
+    r"|hold\s+.*?\b(?:in\s+)?confiden"
+    r"|limit\s+access"
+    r"|need\s+to\s+know"
+    r"|shall\s+not\s+disclose\s+to\s+any\s+(?:third\s+party|person)"
+    r"|shall\s+use\s+.*?\bonly\s+for"
+    r")",
+    re.IGNORECASE,
+)
+
+_DOC_HAS_EXCLUSIONS = re.compile(
+    r"(?:^\s*\d+\.\s*(?:exclu|exceptions|carve.out|qualif))"
+    r"|(?:^\s*(?:exclu))",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+_DOC_HAS_EXCLUSION_CONTENT = re.compile(
+    r"\b(?:"
+    r"shall\s+not\s+apply\s+to"
+    r"|not\s+apply\s+to"
+    r"|notwithstanding\s+the\s+(?:foregoing|above)"
+    r"|exclu(?:de|sion|sions?)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def suppress_false_ice_wrong_section(
+    issues: List[AuditIssue], doc_text: str = ""
+) -> tuple[List[AuditIssue], List[dict]]:
+    """Suppress 'Incomplete Confidentiality Exclusions' findings where the model
+    quoted the obligations section but the document has a separate exclusions
+    section elsewhere (wrong-section hallucination).
+
+    Returns (filtered_issues, suppression_log).
+    """
+    if not issues:
+        return [], []
+
+    has_exclusions = bool(
+        _DOC_HAS_EXCLUSIONS.search(doc_text)
+        or _DOC_HAS_EXCLUSION_CONTENT.search(doc_text)
+    )
+    if not has_exclusions:
+        return issues, []
+
+    kept: List[AuditIssue] = []
+    suppression_log: List[dict] = []
+
+    for issue in issues:
+        title = (issue.issue_title or "").strip()
+        if not _INCOMPLETE_EXCLUSION_TITLE_RE.search(title):
+            kept.append(issue)
+            continue
+
+        qt = issue.quoted_text or ""
+        if not _OBLIGATION_QT_SIGNALS.search(qt):
+            kept.append(issue)
+            continue
+
+        suppression_log.append({
+            "issue_title": title,
+            "severity": issue.severity,
+            "category": issue.category,
+            "quoted_text_preview": qt[:120],
+            "suppression_reason": (
+                "ICE finding quotes obligations section; "
+                "document has separate exclusions section elsewhere"
+            ),
+        })
+        logger.info(
+            "[ICEWrongSectionSuppression] Suppressing '%s' "
+            "— quoted text is from obligations, exclusions section exists in doc",
+            title,
+        )
+        continue
+
+    return kept, suppression_log
+
+
 _TITLE_TOPIC_WORDS: Dict[str, List[str]] = {
     "non-compete": ["non-compete", "compete", "competition", "non-competition", "restrictive"],
     "non-solicitation": ["solicit", "solicitation", "recruit", "hire", "poach"],
@@ -2012,6 +2216,9 @@ def normalize_audit_response(
     structured_issues = suppress_mismatched_title_findings(structured_issues)
     structured_issues = rewrite_mislabeled_titles(structured_issues)
     structured_issues, _ = suppress_false_incomplete_confidentiality_exclusions(structured_issues, doc_text)
+    structured_issues, _ = suppress_false_excessive_noncompete_findings(structured_issues, doc_text)
+    structured_issues, _ = suppress_false_overbroad_invention_assignment_findings(structured_issues, doc_text)
+    structured_issues, _ = suppress_false_ice_wrong_section(structured_issues, doc_text)
     return render_legacy_audit_text(response_text, structured_issues), structured_issues
 
 def normalize_issue_severity(response_text: str) -> str:
