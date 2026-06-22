@@ -45,6 +45,7 @@ from backend.prompts import build_execution_prompt
 from backend.services.pdf_service import extract_text_from_pdf, extract_text_from_pdf_with_stats
 from backend.services.docx_service import extract_text_from_docx, extract_text_from_docx_with_stats
 from backend.utils.timing import log_timing
+from backend.verifiers import run_verifiers
 
 MODEL_NAME = settings.MODEL_FAST
 # =====================
@@ -392,6 +393,16 @@ def ask(q: Query, response_format: Optional[str] = None):
                 structured["fallback_used"] = True
                 if "metadata" in structured:
                     structured["metadata"]["fallback_used"] = True
+            # ---- Verifier Layer ----
+            if session["mode"] == "AUDIT" and structured.get("response_type") == "audit":
+                try:
+                    verifier_issues = run_verifiers(text, structured.get("issues", []))
+                    if verifier_issues:
+                        structured["issues"].extend(verifier_issues)
+                        structured["issue_count"] = len(structured["issues"])
+                        logger.info("[Verifier] Appended %d verifier issue(s)", len(verifier_issues))
+                except Exception as e:
+                    logger.error("[Verifier] Failed: %s", e)
             session["last_structured_response"] = structured
             if not validate_response(structured, session["mode"]):
                 logger.warning(f"[Schema] {session['mode']} response validation failed during fresh execution")
@@ -493,6 +504,16 @@ def ask(q: Query, response_format: Optional[str] = None):
                     structured["fallback_used"] = True
                     if "metadata" in structured:
                         structured["metadata"]["fallback_used"] = True
+                # ---- Verifier Layer ----
+                if session["mode"] == "AUDIT" and structured.get("response_type") == "audit":
+                    try:
+                        verifier_issues = run_verifiers(text, structured.get("issues", []))
+                        if verifier_issues:
+                            structured["issues"].extend(verifier_issues)
+                            structured["issue_count"] = len(structured["issues"])
+                            logger.info("[Verifier] Appended %d verifier issue(s)", len(verifier_issues))
+                    except Exception as e:
+                        logger.error("[Verifier] Failed: %s", e)
                 session["last_structured_response"] = structured
                 if not validate_response(structured, session["mode"]):
                     logger.warning(f"[Schema] {session['mode']} response validation failed during streaming")
@@ -902,6 +923,16 @@ def ask_file(
                 structured["fallback_used"] = True
                 if "metadata" in structured:
                     structured["metadata"]["fallback_used"] = True
+            # ---- Verifier Layer ----
+            if effective_mode == "AUDIT" and structured.get("response_type") == "audit":
+                try:
+                    verifier_issues = run_verifiers(text, structured.get("issues", []))
+                    if verifier_issues:
+                        structured["issues"].extend(verifier_issues)
+                        structured["issue_count"] = len(structured["issues"])
+                        logger.info("[Verifier] Appended %d verifier issue(s)", len(verifier_issues))
+                except Exception as e:
+                    logger.error("[Verifier] Failed: %s", e)
             session["last_structured_response"] = structured
             # Persist audit to database (reuse structured - no duplicate rebuild)
             try:
