@@ -1,0 +1,518 @@
+{
+  "full": {
+    "tp": 7,
+    "fp": 6,
+    "fn": 3,
+    "precision": 0.5385,
+    "recall": 0.7,
+    "composite": 75.88,
+    "per_doc": {
+      "NDA-01": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 0,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": []
+      },
+      "NDA-02": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 1,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": [
+          "Incomplete Confidentiality Exclusions"
+        ]
+      },
+      "NDA-03": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 1,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": [
+          "Non-Solicitation Clause"
+        ]
+      },
+      "NDA-04": {
+        "tp": 1,
+        "fp": 1,
+        "fn": 0,
+        "n_issues": 2,
+        "fn_titles": [],
+        "fp_titles": [
+          "Incomplete Confidentiality Exclusions"
+        ],
+        "tp_titles": [
+          "Perpetual Confidentiality Survival"
+        ]
+      },
+      "EMP-01": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 0,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": []
+      },
+      "EMP-02": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 2,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": [
+          "Excessive Non-Compete Duration",
+          "Overbroad Invention Assignment"
+        ]
+      },
+      "EMP-03": {
+        "tp": 0,
+        "fp": 2,
+        "fn": 1,
+        "n_issues": 2,
+        "fn_titles": [
+          "Single-Trigger Change of Control Acceleration"
+        ],
+        "fp_titles": [
+          "Incomplete Confidentiality Exclusions",
+          "Single-Trigger Change of Control Acceleration"
+        ],
+        "tp_titles": []
+      },
+      "VEN-01": {
+        "tp": 0,
+        "fp": 1,
+        "fn": 0,
+        "n_issues": 1,
+        "fn_titles": [],
+        "fp_titles": [
+          "Limitation of Liability Exceeding Fees"
+        ],
+        "tp_titles": []
+      },
+      "VEN-02": {
+        "tp": 1,
+        "fp": 1,
+        "fn": 2,
+        "n_issues": 2,
+        "fn_titles": [
+          "AS-IS No Warranty Provision",
+          "Asymmetric Termination Rights"
+        ],
+        "fp_titles": [
+          "No Indemnification"
+        ],
+        "tp_titles": [
+          "No Service Level Agreement"
+        ]
+      },
+      "VEN-03": {
+        "tp": 1,
+        "fp": 1,
+        "fn": 0,
+        "n_issues": 2,
+        "fn_titles": [],
+        "fp_titles": [
+          "Confidentiality Survival"
+        ],
+        "tp_titles": [
+          "Consultant Retains All Deliverable IP"
+        ]
+      }
+    }
+  },
+  "saas": {
+    "tp": 7,
+    "fp": 6,
+    "fn": 3,
+    "precision": 0.5385,
+    "recall": 0.7,
+    "composite": 75.88,
+    "per_doc": {
+      "NDA-01": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 0,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": []
+      },
+      "NDA-02": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 1,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": [
+          "Incomplete Confidentiality Exclusions"
+        ]
+      },
+      "NDA-03": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 1,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": [
+          "Non-Solicitation Clause"
+        ]
+      },
+      "NDA-04": {
+        "tp": 1,
+        "fp": 1,
+        "fn": 0,
+        "n_issues": 2,
+        "fn_titles": [],
+        "fp_titles": [
+          "Incomplete Confidentiality Exclusions"
+        ],
+        "tp_titles": [
+          "Perpetual Confidentiality Survival"
+        ]
+      },
+      "EMP-01": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 0,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": []
+      },
+      "EMP-02": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 2,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": [
+          "Excessive Non-Compete Duration",
+          "Overbroad Invention Assignment"
+        ]
+      },
+      "EMP-03": {
+        "tp": 0,
+        "fp": 2,
+        "fn": 1,
+        "n_issues": 2,
+        "fn_titles": [
+          "Single-Trigger Change of Control Acceleration"
+        ],
+        "fp_titles": [
+          "Incomplete Confidentiality Exclusions",
+          "Single-Trigger Change of Control Acceleration"
+        ],
+        "tp_titles": []
+      },
+      "VEN-01": {
+        "tp": 0,
+        "fp": 1,
+        "fn": 0,
+        "n_issues": 1,
+        "fn_titles": [],
+        "fp_titles": [
+          "Limitation of Liability Exceeding Fees"
+        ],
+        "tp_titles": []
+      },
+      "VEN-02": {
+        "tp": 1,
+        "fp": 1,
+        "fn": 2,
+        "n_issues": 2,
+        "fn_titles": [
+          "AS-IS No Warranty Provision",
+          "Asymmetric Termination Rights"
+        ],
+        "fp_titles": [
+          "No Indemnification"
+        ],
+        "tp_titles": [
+          "No Service Level Agreement"
+        ]
+      },
+      "VEN-03": {
+        "tp": 1,
+        "fp": 1,
+        "fn": 0,
+        "n_issues": 2,
+        "fn_titles": [],
+        "fp_titles": [
+          "Confidentiality Survival"
+        ],
+        "tp_titles": [
+          "Consultant Retains All Deliverable IP"
+        ]
+      }
+    }
+  },
+  "emp": {
+    "tp": 7,
+    "fp": 6,
+    "fn": 3,
+    "precision": 0.5385,
+    "recall": 0.7,
+    "composite": 75.88,
+    "per_doc": {
+      "NDA-01": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 0,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": []
+      },
+      "NDA-02": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 1,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": [
+          "Incomplete Confidentiality Exclusions"
+        ]
+      },
+      "NDA-03": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 1,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": [
+          "Non-Solicitation Clause"
+        ]
+      },
+      "NDA-04": {
+        "tp": 1,
+        "fp": 1,
+        "fn": 0,
+        "n_issues": 2,
+        "fn_titles": [],
+        "fp_titles": [
+          "Incomplete Confidentiality Exclusions"
+        ],
+        "tp_titles": [
+          "Perpetual Confidentiality Survival"
+        ]
+      },
+      "EMP-01": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 0,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": []
+      },
+      "EMP-02": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 2,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": [
+          "Excessive Non-Compete Duration",
+          "Overbroad Invention Assignment"
+        ]
+      },
+      "EMP-03": {
+        "tp": 0,
+        "fp": 2,
+        "fn": 1,
+        "n_issues": 2,
+        "fn_titles": [
+          "Single-Trigger Change of Control Acceleration"
+        ],
+        "fp_titles": [
+          "Incomplete Confidentiality Exclusions",
+          "Single-Trigger Change of Control Acceleration"
+        ],
+        "tp_titles": []
+      },
+      "VEN-01": {
+        "tp": 0,
+        "fp": 1,
+        "fn": 0,
+        "n_issues": 1,
+        "fn_titles": [],
+        "fp_titles": [
+          "Limitation of Liability Exceeding Fees"
+        ],
+        "tp_titles": []
+      },
+      "VEN-02": {
+        "tp": 1,
+        "fp": 1,
+        "fn": 2,
+        "n_issues": 2,
+        "fn_titles": [
+          "AS-IS No Warranty Provision",
+          "Asymmetric Termination Rights"
+        ],
+        "fp_titles": [
+          "No Indemnification"
+        ],
+        "tp_titles": [
+          "No Service Level Agreement"
+        ]
+      },
+      "VEN-03": {
+        "tp": 1,
+        "fp": 1,
+        "fn": 0,
+        "n_issues": 2,
+        "fn_titles": [],
+        "fp_titles": [
+          "Confidentiality Survival"
+        ],
+        "tp_titles": [
+          "Consultant Retains All Deliverable IP"
+        ]
+      }
+    }
+  },
+  "nda": {
+    "tp": 7,
+    "fp": 6,
+    "fn": 3,
+    "precision": 0.5385,
+    "recall": 0.7,
+    "composite": 75.88,
+    "per_doc": {
+      "NDA-01": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 0,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": []
+      },
+      "NDA-02": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 1,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": [
+          "Incomplete Confidentiality Exclusions"
+        ]
+      },
+      "NDA-03": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 1,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": [
+          "Non-Solicitation Clause"
+        ]
+      },
+      "NDA-04": {
+        "tp": 1,
+        "fp": 1,
+        "fn": 0,
+        "n_issues": 2,
+        "fn_titles": [],
+        "fp_titles": [
+          "Incomplete Confidentiality Exclusions"
+        ],
+        "tp_titles": [
+          "Perpetual Confidentiality Survival"
+        ]
+      },
+      "EMP-01": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 0,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": []
+      },
+      "EMP-02": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "n_issues": 2,
+        "fn_titles": [],
+        "fp_titles": [],
+        "tp_titles": [
+          "Excessive Non-Compete Duration",
+          "Overbroad Invention Assignment"
+        ]
+      },
+      "EMP-03": {
+        "tp": 0,
+        "fp": 2,
+        "fn": 1,
+        "n_issues": 2,
+        "fn_titles": [
+          "Single-Trigger Change of Control Acceleration"
+        ],
+        "fp_titles": [
+          "Incomplete Confidentiality Exclusions",
+          "Single-Trigger Change of Control Acceleration"
+        ],
+        "tp_titles": []
+      },
+      "VEN-01": {
+        "tp": 0,
+        "fp": 1,
+        "fn": 0,
+        "n_issues": 1,
+        "fn_titles": [],
+        "fp_titles": [
+          "Limitation of Liability Exceeding Fees"
+        ],
+        "tp_titles": []
+      },
+      "VEN-02": {
+        "tp": 1,
+        "fp": 1,
+        "fn": 2,
+        "n_issues": 2,
+        "fn_titles": [
+          "AS-IS No Warranty Provision",
+          "Asymmetric Termination Rights"
+        ],
+        "fp_titles": [
+          "No Indemnification"
+        ],
+        "tp_titles": [
+          "No Service Level Agreement"
+        ]
+      },
+      "VEN-03": {
+        "tp": 1,
+        "fp": 1,
+        "fn": 0,
+        "n_issues": 2,
+        "fn_titles": [],
+        "fp_titles": [
+          "Confidentiality Survival"
+        ],
+        "tp_titles": [
+          "Consultant Retains All Deliverable IP"
+        ]
+      }
+    }
+  }
+}

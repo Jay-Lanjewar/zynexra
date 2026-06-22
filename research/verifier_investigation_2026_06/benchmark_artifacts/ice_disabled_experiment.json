@@ -1,0 +1,162 @@
+{
+  "experiment": "ICE_disabled",
+  "revert_file": "D:\\Projects\\Zynexra\\backend\\prompts\\audit_prompt.py.bak",
+  "timestamp": "2026-06-18T13:29:04Z",
+  "overall": {
+    "parse_success_rate": 0.9,
+    "precision": 0.5455,
+    "recall": 0.6,
+    "false_positive_rate": 0.4545,
+    "false_negative_rate": 0.4,
+    "severity_accuracy": 1.0,
+    "title_accuracy": 1.0,
+    "exact_title_matches": 5,
+    "partial_title_matches": 1,
+    "title_mismatched_tps": 0,
+    "composite_score": 72.33,
+    "total_tp": 6,
+    "total_fp": 5,
+    "total_fn": 4,
+    "total_gt": 10,
+    "documents_parsed": 9,
+    "documents_total": 10
+  },
+  "per_document": [
+    {
+      "doc_id": "NDA-01",
+      "issue_count": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "generated_issues": [],
+      "false_positives": [],
+      "false_negatives": []
+    },
+    {
+      "doc_id": "NDA-02",
+      "issue_count": 1,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "generated_issues": [
+        "Incomplete Confidentiality Exclusions"
+      ],
+      "false_positives": [],
+      "false_negatives": []
+    },
+    {
+      "doc_id": "NDA-03",
+      "issue_count": 1,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "generated_issues": [
+        "Non-Solicitation Clause"
+      ],
+      "false_positives": [],
+      "false_negatives": []
+    },
+    {
+      "doc_id": "NDA-04",
+      "issue_count": 2,
+      "tp": 1,
+      "fp": 1,
+      "fn": 0,
+      "generated_issues": [
+        "Perpetual Confidentiality Survival",
+        "Incomplete Confidentiality Exclusions"
+      ],
+      "false_positives": [
+        "Incomplete Confidentiality Exclusions"
+      ],
+      "false_negatives": []
+    },
+    {
+      "doc_id": "EMP-01",
+      "issue_count": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "generated_issues": [],
+      "false_positives": [],
+      "false_negatives": []
+    },
+    {
+      "doc_id": "EMP-02",
+      "issue_count": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "generated_issues": [
+        "Overbroad Invention Assignment",
+        "Excessive Non-Compete Duration"
+      ],
+      "false_positives": [],
+      "false_negatives": []
+    },
+    {
+      "doc_id": "EMP-03",
+      "issue_count": 1,
+      "tp": 0,
+      "fp": 1,
+      "fn": 1,
+      "generated_issues": [
+        "Excessive Non-Compete Duration"
+      ],
+      "false_positives": [
+        "Excessive Non-Compete Duration"
+      ],
+      "false_negatives": [
+        "Single-Trigger Change of Control Acceleration"
+      ]
+    },
+    {
+      "doc_id": "VEN-01",
+      "issue_count": 1,
+      "tp": 0,
+      "fp": 1,
+      "fn": 0,
+      "generated_issues": [
+        "Liability Exposure"
+      ],
+      "false_positives": [
+        "Liability Exposure"
+      ],
+      "false_negatives": []
+    },
+    {
+      "doc_id": "VEN-02",
+      "issue_count": 2,
+      "tp": 1,
+      "fp": 1,
+      "fn": 2,
+      "generated_issues": [
+        "No Service Level Agreement",
+        "No Indemnification"
+      ],
+      "false_positives": [
+        "No Indemnification"
+      ],
+      "false_negatives": [
+        "AS-IS No Warranty Provision",
+        "Asymmetric Termination Rights"
+      ]
+    },
+    {
+      "doc_id": "VEN-03",
+      "issue_count": 1,
+      "tp": 0,
+      "fp": 1,
+      "fn": 1,
+      "generated_issues": [
+        "Limitation of Liability"
+      ],
+      "false_positives": [
+        "Limitation of Liability"
+      ],
+      "false_negatives": [
+        "Consultant Retains All Deliverable IP"
+      ]
+    }
+  ]
+}

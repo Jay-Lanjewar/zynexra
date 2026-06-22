@@ -1,0 +1,1011 @@
+{
+  "run_id": "phase1-20260614_170013",
+  "model": "qwen2.5:3b-instruct",
+  "timestamp": "2026-06-14T11:30:13Z",
+  "corpus": {
+    "documents": 10,
+    "nda": 4,
+    "employment": 3,
+    "vendor": 3
+  },
+  "overall": {
+    "parse_success_rate": 0.9,
+    "precision": 0.5,
+    "recall": 0.6,
+    "false_positive_rate": 0.5,
+    "false_negative_rate": 0.4,
+    "severity_accuracy": 1.0,
+    "title_accuracy": 1.0,
+    "exact_title_matches": 5,
+    "partial_title_matches": 1,
+    "title_mismatched_tps": 0,
+    "composite_score": 69.9,
+    "total_tp": 6,
+    "total_fp": 6,
+    "total_fn": 4,
+    "total_gt": 10,
+    "documents_parsed": 9,
+    "documents_total": 10
+  },
+  "per_document": [
+    {
+      "doc_id": "NDA-01",
+      "pass": true,
+      "fail_reasons": [],
+      "parse_ok": true,
+      "issue_count": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "gt_count": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "severity_accuracy": 1.0,
+      "title_accuracy": 1.0,
+      "exact_title_matches": 0,
+      "partial_title_matches": 0,
+      "title_mismatched_tps": 0,
+      "title_overlap_rate": 1.0,
+      "confidence_score": 0.37400000000000005,
+      "confidence_label": "LOW",
+      "categories": [],
+      "false_positives": [],
+      "false_negatives": [],
+      "true_positives": [],
+      "raw_response": {
+        "success": true,
+        "model": "qwen2.5:3b-instruct",
+        "mode": "AUDIT",
+        "response_type": "audit",
+        "schema_version": 1,
+        "issue_count": 0,
+        "issues": [],
+        "structured_parse_failed": false,
+        "legacy_text": "Issue: Confidentiality Survival\nSeverity: MEDIUM\nCategory: Enforceability Weakness\nLocation: 4. Term and Survival\nQuoted Text: \"This Agreement shall commence on the Effective Date and continue for a period of two (2) years. The confidentiality obligations set forth herein shall survive termination or expiration of this Agreement and continue for a period of three (3) years thereafter.\nRisk Explanation: The survival clause specifies that confidentiality obligations 'shall survive termination or expiration of this Agreement and continue for a period of three (3) years thereafter.' This is flagged as an Enforceability Weakness because the duration specified ('three (3) years') does not include the two-year term, creating a potential gap in protection.\nSuggested Improvement: The survival clause should specify that confidentiality obligations 'shall survive termination or expiration of this Agreement and continue for a period of three (3) years thereafter, including the initial two-year term.'",
+        "confidence_score": 0.37400000000000005,
+        "confidence_label": "LOW",
+        "fallback_used": true,
+        "quality_warning": "",
+        "metadata": {
+          "model_name": "qwen2.5:3b-instruct",
+          "inference_duration_ms": 45934,
+          "parser_used": "json",
+          "fallback_used": true,
+          "semantic_suppressed": false,
+          "domain": "LEGAL",
+          "domain_confidence": 0.2975,
+          "policy_detection": "UNCLEAR",
+          "policy_type": "Institutional Notice",
+          "policy_confidence": 0.1641,
+          "policy_explanation": "This document is an institutional notice, announcement, or official communication providing information rather than contractual terms.",
+          "policy_keywords": [
+            "term",
+            "effective date",
+            "entitled",
+            "consent",
+            "grants",
+            "obligations",
+            "degree"
+          ],
+          "contractual_signals": [
+            "disclosing party",
+            "receiving party",
+            "shall be governed",
+            "supersedes all prior",
+            "governing law",
+            "injunctive relief",
+            "by and between",
+            "confidential information",
+            "this agreement",
+            "non-disclosure agreement"
+          ]
+        }
+      }
+    },
+    {
+      "doc_id": "NDA-02",
+      "pass": true,
+      "fail_reasons": [],
+      "parse_ok": true,
+      "issue_count": 1,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "gt_count": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "severity_accuracy": 1.0,
+      "title_accuracy": 1.0,
+      "exact_title_matches": 1,
+      "partial_title_matches": 0,
+      "title_mismatched_tps": 0,
+      "title_overlap_rate": 1.0,
+      "confidence_score": 0.6309999999999999,
+      "confidence_label": "MEDIUM",
+      "categories": [
+        "Enforceability Weakness"
+      ],
+      "false_positives": [],
+      "false_negatives": [],
+      "true_positives": [
+        {
+          "issue_title": "Incomplete Confidentiality Exclusions",
+          "severity": "MEDIUM",
+          "category": "Enforceability Weakness",
+          "matched_gt_id": "NDA-02-A",
+          "matched_gt_title": "Incomplete Confidentiality Exclusions",
+          "title_classification": "exact",
+          "details": {
+            "category_match": true,
+            "severity_match": true,
+            "title_match": true,
+            "quoted_text_match": true,
+            "explanation_match": true,
+            "title_classification": "exact"
+          }
+        }
+      ],
+      "raw_response": {
+        "success": true,
+        "model": "qwen2.5:3b-instruct",
+        "mode": "AUDIT",
+        "response_type": "audit",
+        "schema_version": 1,
+        "issue_count": 1,
+        "issues": [
+          {
+            "issue_title": "Incomplete Confidentiality Exclusions",
+            "severity": "MEDIUM",
+            "category": "Enforceability Weakness",
+            "location": "2. Obligations (Exclusions)",
+            "quoted_text": "(a) is or becomes publicly available through no fault of Recipient; (b) was in Recipient's lawful possession prior to disclosure.",
+            "risk_explanation": "The confidentiality obligations include exclusions for information that is or becomes publicly available, and information previously possessed by the recipient. However, there are no additional exclusions listed after these two points.",
+            "suggested_improvement": "Include an entire agreement clause to prevent extrinsic claims"
+          }
+        ],
+        "structured_parse_failed": false,
+        "legacy_text": "Issue: Confidentiality Survival Clause\nSeverity: MEDIUM\nCategory: Enforceability Weakness\nLocation: 4. Term\nQuoted Text: The confidentiality obligations shall survive termination for a period of five (5) years.\nRisk Explanation: The survival clause specifies a duration of five years, which is not considered perpetual in the absence of language like 'perpetually,' 'indefinitely,' or 'without limit.'\nSuggested Improvement: We recommend retaining the current survival period but ensuring that it does not conflict with other contractual obligations.\n\nIssue: Incomplete Confidentiality Exclusions\nSeverity: MEDIUM\nCategory: Enforceability Weakness\nLocation: 2. Obligations (Exclusions)\nQuoted Text: (a) is or becomes publicly available through no fault of Recipient; (b) was in Recipient's lawful possession prior to disclosure.\nRisk Explanation: The confidentiality obligations include exclusions for information that is or becomes publicly available, and information previously possessed by the recipient. However, there are no additional exclusions listed after these two points.\nSuggested Improvement: Include an entire agreement clause to prevent extrinsic claims",
+        "confidence_score": 0.6309999999999999,
+        "confidence_label": "MEDIUM",
+        "fallback_used": true,
+        "quality_warning": "",
+        "metadata": {
+          "model_name": "qwen2.5:3b-instruct",
+          "inference_duration_ms": 45183,
+          "parser_used": "json",
+          "fallback_used": true,
+          "semantic_suppressed": false,
+          "domain": "LEGAL",
+          "domain_confidence": 0.3579,
+          "policy_detection": "UNCLEAR",
+          "policy_type": "Institutional Notice",
+          "policy_confidence": 0.2129,
+          "policy_explanation": "This document is an institutional notice, announcement, or official communication providing information rather than contractual terms.",
+          "policy_keywords": [
+            "assignment",
+            "term",
+            "effective date",
+            "entitled",
+            "requirement",
+            "research",
+            "consent",
+            "grants",
+            "violation",
+            "obligations"
+          ],
+          "contractual_signals": [
+            "shall be governed",
+            "governing law",
+            "injunctive relief",
+            "by and between",
+            "confidential information",
+            "irreparable harm",
+            "this agreement",
+            "non-disclosure agreement"
+          ]
+        }
+      }
+    },
+    {
+      "doc_id": "NDA-03",
+      "pass": true,
+      "fail_reasons": [],
+      "parse_ok": true,
+      "issue_count": 1,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "gt_count": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "severity_accuracy": 1.0,
+      "title_accuracy": 1.0,
+      "exact_title_matches": 0,
+      "partial_title_matches": 1,
+      "title_mismatched_tps": 0,
+      "title_overlap_rate": 1.0,
+      "confidence_score": 0.7060000000000001,
+      "confidence_label": "MEDIUM",
+      "categories": [
+        "Negotiation Imbalance"
+      ],
+      "false_positives": [],
+      "false_negatives": [],
+      "true_positives": [
+        {
+          "issue_title": "Non-Solicitation Clause",
+          "severity": "LOW",
+          "category": "Negotiation Imbalance",
+          "matched_gt_id": "NDA-03-A",
+          "matched_gt_title": "Non-Solicitation Clause in NDA",
+          "title_classification": "partial",
+          "details": {
+            "category_match": true,
+            "severity_match": true,
+            "title_match": true,
+            "quoted_text_match": true,
+            "explanation_match": true,
+            "title_classification": "partial"
+          }
+        }
+      ],
+      "raw_response": {
+        "success": true,
+        "model": "qwen2.5:3b-instruct",
+        "mode": "AUDIT",
+        "response_type": "audit",
+        "schema_version": 1,
+        "issue_count": 1,
+        "issues": [
+          {
+            "issue_title": "Non-Solicitation Clause",
+            "severity": "LOW",
+            "category": "Negotiation Imbalance",
+            "location": "5. NON-SOLICITATION",
+            "quoted_text": "During the term of this Agreement and for a period of twelve (12) months thereafter, neither Party shall directly or indirectly solicit, induce, or encourage any employee of the other Party to terminate their employment or engagement, or hire any such employee.",
+            "risk_explanation": "The non-solicitation clause restricts soliciting employees from either party. This is a standard term in NDAs and does not create significant financial risk unless it extends beyond 12 months or has an overly broad geographic scope.",
+            "suggested_improvement": "Balance termination and renewal rights between parties and Ensure remedies, warranties, and limitations apply equally to both parties"
+          }
+        ],
+        "structured_parse_failed": false,
+        "legacy_text": "Issue: Confidentiality Survival Clause\nSeverity: MEDIUM\nCategory: Enforceability Weakness\nLocation: 4. TERM\nQuoted Text: This Agreement shall commence on the Effective Date and continue for two (2) years. Confidentiality obligations shall survive for three (3) years after termination.\nRisk Explanation: The survival period of three years is described as 'survive' without specifying a duration, which could be interpreted as perpetual or indefinite. This creates an enforceability weakness since the term does not clearly define the exact duration of confidentiality obligations.\nSuggested Improvement: Confidentiality obligations shall survive for three (3) years after termination.\n\nIssue: Non-Solicitation Clause\nSeverity: LOW\nCategory: Negotiation Imbalance\nLocation: 5. NON-SOLICITATION\nQuoted Text: During the term of this Agreement and for a period of twelve (12) months thereafter, neither Party shall directly or indirectly solicit, induce, or encourage any employee of the other Party to terminate their employment or engagement, or hire any such employee.\nRisk Explanation: The non-solicitation clause restricts soliciting employees from either party. This is a standard term in NDAs and does not create significant financial risk unless it extends beyond 12 months or has an overly broad geographic scope.\nSuggested Improvement: Balance termination and renewal rights between parties and Ensure remedies, warranties, and limitations apply equally to both parties",
+        "confidence_score": 0.7060000000000001,
+        "confidence_label": "MEDIUM",
+        "fallback_used": true,
+        "quality_warning": "",
+        "metadata": {
+          "model_name": "qwen2.5:3b-instruct",
+          "inference_duration_ms": 37114,
+          "parser_used": "json",
+          "fallback_used": true,
+          "semantic_suppressed": false,
+          "domain": "LEGAL",
+          "domain_confidence": 0.3173,
+          "policy_detection": "UNCLEAR",
+          "policy_type": "Institutional Notice",
+          "policy_confidence": 0.1264,
+          "policy_explanation": "This document is an institutional notice, announcement, or official communication providing information rather than contractual terms.",
+          "policy_keywords": [
+            "term",
+            "effective date",
+            "engagement",
+            "entitled",
+            "consent",
+            "obligations"
+          ],
+          "contractual_signals": [
+            "disclosing party",
+            "receiving party",
+            "shall be governed",
+            "governing law",
+            "injunctive relief",
+            "by and between",
+            "confidential information",
+            "this agreement",
+            "non-disclosure agreement"
+          ]
+        }
+      }
+    },
+    {
+      "doc_id": "NDA-04",
+      "pass": false,
+      "fail_reasons": [
+        "1 false positive(s)"
+      ],
+      "parse_ok": true,
+      "issue_count": 2,
+      "tp": 1,
+      "fp": 1,
+      "fn": 0,
+      "gt_count": 1,
+      "precision": 0.5,
+      "recall": 1.0,
+      "severity_accuracy": 1.0,
+      "title_accuracy": 1.0,
+      "exact_title_matches": 1,
+      "partial_title_matches": 0,
+      "title_mismatched_tps": 0,
+      "title_overlap_rate": 1.0,
+      "confidence_score": 0.5760000000000001,
+      "confidence_label": "MEDIUM",
+      "categories": [
+        "Enforceability Weakness",
+        "Enforceability Weakness"
+      ],
+      "false_positives": [
+        {
+          "issue_title": "Incomplete Confidentiality Exclusions",
+          "severity": "MEDIUM",
+          "category": "Enforceability Weakness"
+        }
+      ],
+      "false_negatives": [],
+      "true_positives": [
+        {
+          "issue_title": "Perpetual Confidentiality Survival",
+          "severity": "MEDIUM",
+          "category": "Enforceability Weakness",
+          "matched_gt_id": "NDA-04-A",
+          "matched_gt_title": "Perpetual Confidentiality Survival",
+          "title_classification": "exact",
+          "details": {
+            "category_match": true,
+            "severity_match": true,
+            "title_match": true,
+            "quoted_text_match": true,
+            "explanation_match": true,
+            "title_classification": "exact"
+          }
+        }
+      ],
+      "raw_response": {
+        "success": true,
+        "model": "qwen2.5:3b-instruct",
+        "mode": "AUDIT",
+        "response_type": "audit",
+        "schema_version": 1,
+        "issue_count": 2,
+        "issues": [
+          {
+            "issue_title": "Perpetual Confidentiality Survival",
+            "severity": "MEDIUM",
+            "category": "Enforceability Weakness",
+            "location": "4. Term and Survival",
+            "quoted_text": "Confidentiality obligations shall survive termination or expiration of this Agreement perpetually and shall continue in full force and effect indefinitely.",
+            "risk_explanation": "The survival clause uses the term 'perpetual' which is not legally permissible for confidentiality obligations, creating an enforceability weakness.",
+            "suggested_improvement": "Confidentiality obligations shall survive termination or expiration of this Agreement for a period of one (1) year and then continue in full force and effect indefinitely."
+          },
+          {
+            "issue_title": "Incomplete Confidentiality Exclusions",
+            "severity": "MEDIUM",
+            "category": "Enforceability Weakness",
+            "location": "2. Obligations, 3. Exclusions",
+            "quoted_text": "\"The obligations in Section 2 shall not apply to information that is or becomes generally available to the public other than as a result of a disclosure by Counterparty in violation of this Agreement.\"",
+            "risk_explanation": "The exclusions list contains only one item (information becoming publicly available), which does not meet the requirement of having at least four standard carve-outs.",
+            "suggested_improvement": "Include an entire agreement clause to prevent extrinsic claims"
+          }
+        ],
+        "structured_parse_failed": false,
+        "legacy_text": "Issue: Perpetual Confidentiality Survival\nSeverity: MEDIUM\nCategory: Enforceability Weakness\nLocation: 4. Term and Survival\nQuoted Text: Confidentiality obligations shall survive termination or expiration of this Agreement perpetually and shall continue in full force and effect indefinitely.\nRisk Explanation: The survival clause uses the term 'perpetual' which is not legally permissible for confidentiality obligations, creating an enforceability weakness.\nSuggested Improvement: Confidentiality obligations shall survive termination or expiration of this Agreement for a period of one (1) year and then continue in full force and effect indefinitely.\n\nIssue: Incomplete Confidentiality Exclusions\nSeverity: MEDIUM\nCategory: Enforceability Weakness\nLocation: 2. Obligations, 3. Exclusions\nQuoted Text: \"The obligations in Section 2 shall not apply to information that is or becomes generally available to the public other than as a result of a disclosure by Counterparty in violation of this Agreement.\"\nRisk Explanation: The exclusions list contains only one item (information becoming publicly available), which does not meet the requirement of having at least four standard carve-outs.\nSuggested Improvement: Include an entire agreement clause to prevent extrinsic claims",
+        "confidence_score": 0.5760000000000001,
+        "confidence_label": "MEDIUM",
+        "fallback_used": true,
+        "quality_warning": "",
+        "metadata": {
+          "model_name": "qwen2.5:3b-instruct",
+          "inference_duration_ms": 35685,
+          "parser_used": "json",
+          "fallback_used": true,
+          "semantic_suppressed": false,
+          "domain": "LEGAL",
+          "domain_confidence": 0.2646,
+          "policy_detection": "UNCLEAR",
+          "policy_type": "Institutional Notice",
+          "policy_confidence": 0.1535,
+          "policy_explanation": "This document is an institutional notice, announcement, or official communication providing information rather than contractual terms.",
+          "policy_keywords": [
+            "renew",
+            "term",
+            "effective date",
+            "entitled",
+            "violation",
+            "renewal",
+            "obligations",
+            "degree",
+            "notice"
+          ],
+          "contractual_signals": [
+            "shall be governed",
+            "governing law",
+            "injunctive relief",
+            "by and between",
+            "confidential information",
+            "irreparable harm",
+            "this agreement",
+            "confidentiality agreement",
+            "entire agreement"
+          ]
+        }
+      }
+    },
+    {
+      "doc_id": "EMP-01",
+      "pass": false,
+      "fail_reasons": [
+        "parse_failed"
+      ],
+      "parse_ok": false,
+      "issue_count": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "gt_count": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "severity_accuracy": 1.0,
+      "title_accuracy": 1.0,
+      "exact_title_matches": 0,
+      "partial_title_matches": 0,
+      "title_mismatched_tps": 0,
+      "title_overlap_rate": 1.0,
+      "confidence_score": 0.0,
+      "confidence_label": "LOW",
+      "categories": [],
+      "false_positives": [],
+      "false_negatives": [],
+      "true_positives": [],
+      "raw_response": {
+        "success": false,
+        "model": "qwen2.5:3b-instruct",
+        "mode": "AUDIT",
+        "response_type": "audit",
+        "schema_version": 1,
+        "issue_count": 0,
+        "issues": [],
+        "structured_parse_failed": true,
+        "legacy_text": "[SYSTEM ERROR] Response validation failed due to invalid format.",
+        "confidence_score": 0.0,
+        "confidence_label": "LOW",
+        "fallback_used": false,
+        "quality_warning": "",
+        "metadata": {}
+      }
+    },
+    {
+      "doc_id": "EMP-02",
+      "pass": true,
+      "fail_reasons": [],
+      "parse_ok": true,
+      "issue_count": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "gt_count": 2,
+      "precision": 1.0,
+      "recall": 1.0,
+      "severity_accuracy": 1.0,
+      "title_accuracy": 1.0,
+      "exact_title_matches": 2,
+      "partial_title_matches": 0,
+      "title_mismatched_tps": 0,
+      "title_overlap_rate": 1.0,
+      "confidence_score": 0.486,
+      "confidence_label": "MEDIUM",
+      "categories": [
+        "Intellectual Property",
+        "Negotiation Imbalance"
+      ],
+      "false_positives": [],
+      "false_negatives": [],
+      "true_positives": [
+        {
+          "issue_title": "Overbroad Invention Assignment",
+          "severity": "HIGH",
+          "category": "Intellectual Property",
+          "matched_gt_id": "EMP-02-A",
+          "matched_gt_title": "Overbroad Invention Assignment",
+          "title_classification": "exact",
+          "details": {
+            "category_match": true,
+            "severity_match": true,
+            "title_match": true,
+            "quoted_text_match": true,
+            "explanation_match": true,
+            "title_classification": "exact"
+          }
+        },
+        {
+          "issue_title": "Excessive Non-Compete Duration",
+          "severity": "MEDIUM",
+          "category": "Negotiation Imbalance",
+          "matched_gt_id": "EMP-02-B",
+          "matched_gt_title": "Excessive Non-Compete Duration",
+          "title_classification": "exact",
+          "details": {
+            "category_match": true,
+            "severity_match": true,
+            "title_match": true,
+            "quoted_text_match": true,
+            "explanation_match": true,
+            "title_classification": "exact"
+          }
+        }
+      ],
+      "raw_response": {
+        "success": true,
+        "model": "qwen2.5:3b-instruct",
+        "mode": "AUDIT",
+        "response_type": "audit",
+        "schema_version": 1,
+        "issue_count": 2,
+        "issues": [
+          {
+            "issue_title": "Overbroad Invention Assignment",
+            "severity": "HIGH",
+            "category": "Intellectual Property",
+            "location": "Clause 5 - INVENTION ASSIGNMENT",
+            "quoted_text": "\"Employee hereby assigns and agrees to assign to Company all inventions, discoveries, improvements, designs, works of authorship, and other intellectual property, whether or not patentable or copyrightable, that Employee may conceive, develop, create, or reduce to practice, alone or jointly with others, during the period of Employee's employment with Company, whether during or outside of working hours, whether on or off Company's premises, and whether or not at Company's request. Employee acknowledges that all such works shall be the sole and exclusive property of Company. This assignment obligation extends to all inventions and intellectual property conceived, developed, or created at any time during employment, anywhere in the world, using any resources, and regardless of whether they relate to Company's business.\"",
+            "risk_explanation": "\"The clause claims ownership of inventions created outside work hours and unrelated to job duties, which is overbroad and may be unenforceable in jurisdictions with statutory protections like CA Labor Code 2870. The clause also extends the assignment obligation to all inventions conceived during employment, regardless of their relevance to Company's business.\"",
+            "suggested_improvement": "\"Employee hereby assigns and agrees to assign to Company all inventions, discoveries, improvements, designs, works of authorship, and other intellectual property that Employee may conceive, develop, create, or reduce to practice during the period of Employee's employment with Company, whether on or off Company's premises, and whether related to job duties. This assignment obligation extends only to such inventions conceived during employment.\""
+          },
+          {
+            "issue_title": "Excessive Non-Compete Duration",
+            "severity": "MEDIUM",
+            "category": "Negotiation Imbalance",
+            "location": "Clause 6 - NON-COMPETITION",
+            "quoted_text": "\"For a period of eighteen (18) months following the termination of Employee's employment for any reason, Employee shall not, anywhere in the world, directly or indirectly, own, manage, operate, control, be employed by, participate in, or be connected in any manner with any business that competes with Company's business.\"",
+            "risk_explanation": "\"The clause allows termination of the non-compete restriction upon a change of control event without requiring termination of employment. This creates an imbalance as one party can terminate for convenience (change of control) while the other party must wait until employment ends to terminate the non-compete.\"",
+            "suggested_improvement": "\"For a period of eighteen (18) months following the termination of Employee's employment, whether by reason of change in control or otherwise, Employee shall not, anywhere in the world, directly or indirectly, own, manage, operate, control, be employed by, participate in, or be connected in any manner with any business that competes with Company's business.\""
+          }
+        ],
+        "structured_parse_failed": false,
+        "legacy_text": "Issue: Overbroad Invention Assignment\nSeverity: HIGH\nCategory: Intellectual Property\nLocation: Clause 5 - INVENTION ASSIGNMENT\nQuoted Text: \"Employee hereby assigns and agrees to assign to Company all inventions, discoveries, improvements, designs, works of authorship, and other intellectual property, whether or not patentable or copyrightable, that Employee may conceive, develop, create, or reduce to practice, alone or jointly with others, during the period of Employee's employment with Company, whether during or outside of working hours, whether on or off Company's premises, and whether or not at Company's request. Employee acknowledges that all such works shall be the sole and exclusive property of Company. This assignment obligation extends to all inventions and intellectual property conceived, developed, or created at any time during employment, anywhere in the world, using any resources, and regardless of whether they relate to Company's business.\"\nRisk Explanation: \"The clause claims ownership of inventions created outside work hours and unrelated to job duties, which is overbroad and may be unenforceable in jurisdictions with statutory protections like CA Labor Code 2870. The clause also extends the assignment obligation to all inventions conceived during employment, regardless of their relevance to Company's business.\"\nSuggested Improvement: \"Employee hereby assigns and agrees to assign to Company all inventions, discoveries, improvements, designs, works of authorship, and other intellectual property that Employee may conceive, develop, create, or reduce to practice during the period of Employee's employment with Company, whether on or off Company's premises, and whether related to job duties. This assignment obligation extends only to such inventions conceived during employment.\"\n\nIssue: Excessive Non-Compete Duration\nSeverity: MEDIUM\nCategory: Negotiation Imbalance\nLocation: Clause 6 - NON-COMPETITION\nQuoted Text: \"For a period of eighteen (18) months following the termination of Employee's employment for any reason, Employee shall not, anywhere in the world, directly or indirectly, own, manage, operate, control, be employed by, participate in, or be connected in any manner with any business that competes with Company's business.\"\nRisk Explanation: \"The clause allows termination of the non-compete restriction upon a change of control event without requiring termination of employment. This creates an imbalance as one party can terminate for convenience (change of control) while the other party must wait until employment ends to terminate the non-compete.\"\nSuggested Improvement: \"For a period of eighteen (18) months following the termination of Employee's employment, whether by reason of change in control or otherwise, Employee shall not, anywhere in the world, directly or indirectly, own, manage, operate, control, be employed by, participate in, or be connected in any manner with any business that competes with Company's business.\"",
+        "confidence_score": 0.486,
+        "confidence_label": "MEDIUM",
+        "fallback_used": true,
+        "quality_warning": "",
+        "metadata": {
+          "model_name": "qwen2.5:3b-instruct",
+          "inference_duration_ms": 57565,
+          "parser_used": "json",
+          "fallback_used": true,
+          "semantic_suppressed": false,
+          "domain": "LEGAL",
+          "domain_confidence": 0.25,
+          "policy_detection": "NOT_POLICY",
+          "policy_type": "General Policy",
+          "policy_confidence": 0.0,
+          "policy_explanation": "Document is an employment agreement, not a policy document."
+        }
+      }
+    },
+    {
+      "doc_id": "EMP-03",
+      "pass": false,
+      "fail_reasons": [
+        "catastrophic_false_negative",
+        "missing 1/1 findings",
+        "1 false positive(s)"
+      ],
+      "parse_ok": true,
+      "issue_count": 1,
+      "tp": 0,
+      "fp": 1,
+      "fn": 1,
+      "gt_count": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "severity_accuracy": 1.0,
+      "title_accuracy": 1.0,
+      "exact_title_matches": 0,
+      "partial_title_matches": 0,
+      "title_mismatched_tps": 0,
+      "title_overlap_rate": 1.0,
+      "confidence_score": 0.7460000000000001,
+      "confidence_label": "MEDIUM",
+      "categories": [
+        "Enforceability Weakness"
+      ],
+      "false_positives": [
+        {
+          "issue_title": "Excessive Non-Compete Duration",
+          "severity": "MEDIUM",
+          "category": "Enforceability Weakness"
+        }
+      ],
+      "false_negatives": [
+        {
+          "expected_issue_title": "Single-Trigger Change of Control Acceleration",
+          "expected_severity": "MEDIUM",
+          "expected_category": "Enforceability Weakness",
+          "rationale": "Single-trigger change of control (full acceleration upon change of control without requiring termination) creates a perverse incentive for the executive to facilitate a sale regardless of shareholder interest. Double-trigger (acceleration only if terminated after CIC) is the market standard. This is an unusual provision that weakens corporate governance."
+        }
+      ],
+      "true_positives": [],
+      "raw_response": {
+        "success": true,
+        "model": "qwen2.5:3b-instruct",
+        "mode": "AUDIT",
+        "response_type": "audit",
+        "schema_version": 1,
+        "issue_count": 1,
+        "issues": [
+          {
+            "issue_title": "Excessive Non-Compete Duration",
+            "severity": "MEDIUM",
+            "category": "Enforceability Weakness",
+            "location": "Section 9 (NON-COMPETITION)",
+            "quoted_text": "For twelve (12) months following termination, Executive shall not engage in any business competitive with Company within a one hundred (100) mile radius of Company's headquarters.",
+            "risk_explanation": "The non-compete duration is for 12 months, which may be considered excessive and unenforceable in some jurisdictions. The clause also specifies a geographic scope that could be seen as overly broad.",
+            "suggested_improvement": "Modify the non-compete to specify a shorter duration, such as: 'For six (6) months following termination, Executive shall not engage in any business competitive with Company within a fifty (50) mile radius of Company's headquarters.'"
+          }
+        ],
+        "structured_parse_failed": false,
+        "legacy_text": "Issue: Excessive Non-Compete Duration\nSeverity: MEDIUM\nCategory: Enforceability Weakness\nLocation: Section 9 (NON-COMPETITION)\nQuoted Text: For twelve (12) months following termination, Executive shall not engage in any business competitive with Company within a one hundred (100) mile radius of Company's headquarters.\nRisk Explanation: The non-compete duration is for 12 months, which may be considered excessive and unenforceable in some jurisdictions. The clause also specifies a geographic scope that could be seen as overly broad.\nSuggested Improvement: Modify the non-compete to specify a shorter duration, such as: 'For six (6) months following termination, Executive shall not engage in any business competitive with Company within a fifty (50) mile radius of Company's headquarters.'",
+        "confidence_score": 0.7460000000000001,
+        "confidence_label": "MEDIUM",
+        "fallback_used": true,
+        "quality_warning": "",
+        "metadata": {
+          "model_name": "qwen2.5:3b-instruct",
+          "inference_duration_ms": 61146,
+          "parser_used": "json",
+          "fallback_used": true,
+          "semantic_suppressed": false,
+          "domain": "POSSIBLY_LEGAL",
+          "domain_confidence": 0.1073,
+          "policy_detection": "NOT_POLICY",
+          "policy_type": "General Policy",
+          "policy_confidence": 0.0,
+          "policy_explanation": "Document is an employment agreement, not a policy document."
+        }
+      }
+    },
+    {
+      "doc_id": "VEN-01",
+      "pass": true,
+      "fail_reasons": [],
+      "parse_ok": true,
+      "issue_count": 1,
+      "tp": 0,
+      "fp": 1,
+      "fn": 0,
+      "gt_count": 0,
+      "precision": 0.0,
+      "recall": 1.0,
+      "severity_accuracy": 1.0,
+      "title_accuracy": 1.0,
+      "exact_title_matches": 0,
+      "partial_title_matches": 0,
+      "title_mismatched_tps": 0,
+      "title_overlap_rate": 1.0,
+      "confidence_score": 0.7060000000000001,
+      "confidence_label": "MEDIUM",
+      "categories": [
+        "Confidentiality Risk"
+      ],
+      "false_positives": [
+        {
+          "issue_title": "Incomplete Confidentiality Exclusions",
+          "severity": "MEDIUM",
+          "category": "Confidentiality Risk"
+        }
+      ],
+      "false_negatives": [],
+      "true_positives": [],
+      "raw_response": {
+        "success": true,
+        "model": "qwen2.5:3b-instruct",
+        "mode": "AUDIT",
+        "response_type": "audit",
+        "schema_version": 1,
+        "issue_count": 1,
+        "issues": [
+          {
+            "issue_title": "Incomplete Confidentiality Exclusions",
+            "severity": "MEDIUM",
+            "category": "Confidentiality Risk",
+            "location": "Clause 5",
+            "quoted_text": "Each party shall hold the other party's confidential information in confidence and shall not disclose it to third parties without the other party's consent.",
+            "risk_explanation": "The confidentiality clause does not contain a dedicated 'Exclusions' or 'Exceptions' section that explicitly lists what is NOT covered by the confidentiality obligation. The absence of an exclusion list means the confidentiality obligations are potentially overbroad and may be unenforceable in jurisdictions with statutory protections like California Labor Code 2870.",
+            "suggested_improvement": "Ensure confidentiality obligations survive termination and continue after contract expiration."
+          }
+        ],
+        "structured_parse_failed": false,
+        "legacy_text": "Issue: Incomplete Confidentiality Exclusions\nSeverity: MEDIUM\nCategory: Confidentiality Risk\nLocation: Clause 5\nQuoted Text: Each party shall hold the other party's confidential information in confidence and shall not disclose it to third parties without the other party's consent.\nRisk Explanation: The confidentiality clause does not contain a dedicated 'Exclusions' or 'Exceptions' section that explicitly lists what is NOT covered by the confidentiality obligation. The absence of an exclusion list means the confidentiality obligations are potentially overbroad and may be unenforceable in jurisdictions with statutory protections like California Labor Code 2870.\nSuggested Improvement: Ensure confidentiality obligations survive termination and continue after contract expiration.",
+        "confidence_score": 0.7060000000000001,
+        "confidence_label": "MEDIUM",
+        "fallback_used": true,
+        "quality_warning": "",
+        "metadata": {
+          "model_name": "qwen2.5:3b-instruct",
+          "inference_duration_ms": 35193,
+          "parser_used": "json",
+          "fallback_used": true,
+          "semantic_suppressed": false,
+          "domain": "LEGAL",
+          "domain_confidence": 0.2084,
+          "policy_detection": "UNCLEAR",
+          "policy_type": "Institutional Notice",
+          "policy_confidence": 0.0412,
+          "policy_explanation": "This document is an institutional notice, announcement, or official communication providing information rather than contractual terms.",
+          "policy_keywords": [
+            "credits",
+            "term",
+            "entitled",
+            "consent",
+            "grants",
+            "renewal",
+            "obligations",
+            "subscription",
+            "notice"
+          ],
+          "contractual_signals": [
+            "indemnification",
+            "shall be governed",
+            "limitation of liability",
+            "governing law",
+            "aggregate liability",
+            "indemnify",
+            "by and between",
+            "confidential information",
+            "hold harmless",
+            "this agreement"
+          ]
+        }
+      }
+    },
+    {
+      "doc_id": "VEN-02",
+      "pass": false,
+      "fail_reasons": [
+        "missing 2/3 findings",
+        "1 false positive(s)"
+      ],
+      "parse_ok": true,
+      "issue_count": 2,
+      "tp": 1,
+      "fp": 1,
+      "fn": 2,
+      "gt_count": 3,
+      "precision": 0.5,
+      "recall": 0.3333,
+      "severity_accuracy": 1.0,
+      "title_accuracy": 1.0,
+      "exact_title_matches": 1,
+      "partial_title_matches": 0,
+      "title_mismatched_tps": 0,
+      "title_overlap_rate": 1.0,
+      "confidence_score": 0.7300000000000001,
+      "confidence_label": "MEDIUM",
+      "categories": [
+        "Enforceability Weakness",
+        "Confidentiality Termination"
+      ],
+      "false_positives": [
+        {
+          "issue_title": "Incomplete Confidentiality Exclusions",
+          "severity": "MEDIUM",
+          "category": "Confidentiality Termination"
+        }
+      ],
+      "false_negatives": [
+        {
+          "expected_issue_title": "AS-IS No Warranty Provision",
+          "expected_severity": "MEDIUM",
+          "expected_category": "Enforceability Weakness",
+          "rationale": "The AS-IS/no-warranty provision disclaims all implied warranties (merchantability, fitness, title, non-infringement). In a paid SaaS agreement, this creates significant risk for the customer who is paying for a service with no guarantee of quality or functionality."
+        },
+        {
+          "expected_issue_title": "Asymmetric Termination Rights",
+          "expected_severity": "MEDIUM",
+          "expected_category": "Negotiation Imbalance",
+          "rationale": "Provider can terminate for convenience with 30 days notice, while Customer can only terminate for material breach. This creates a fundamental power imbalance where the customer's business depends on a service the provider can cancel at will."
+        }
+      ],
+      "true_positives": [
+        {
+          "issue_title": "No Service Level Agreement",
+          "severity": "MEDIUM",
+          "category": "Enforceability Weakness",
+          "matched_gt_id": "VEN-02-B",
+          "matched_gt_title": "No Service Level Agreement",
+          "title_classification": "exact",
+          "details": {
+            "category_match": true,
+            "severity_match": true,
+            "title_match": true,
+            "quoted_text_match": true,
+            "explanation_match": true,
+            "title_classification": "exact"
+          }
+        }
+      ],
+      "raw_response": {
+        "success": true,
+        "model": "qwen2.5:3b-instruct",
+        "mode": "AUDIT",
+        "response_type": "audit",
+        "schema_version": 1,
+        "issue_count": 2,
+        "issues": [
+          {
+            "issue_title": "No Service Level Agreement",
+            "severity": "MEDIUM",
+            "category": "Enforceability Weakness",
+            "location": "Clause 4",
+            "quoted_text": "Provider does not guarantee any level of uptime, availability, or performance. Customer's sole remedy for any service interruption is termination of this Agreement.",
+            "risk_explanation": "The absence of a Service Level Agreement (SLA) means the customer has no contractual recourse for service interruptions other than termination.",
+            "suggested_improvement": "Include an entire agreement clause to prevent extrinsic claims"
+          },
+          {
+            "issue_title": "Incomplete Confidentiality Exclusions",
+            "severity": "MEDIUM",
+            "category": "Confidentiality Termination",
+            "location": "Clause 9",
+            "quoted_text": "Each party shall hold the other's confidential information in confidence for a period of three (3) years.",
+            "risk_explanation": "The confidentiality clause does not contain an explicit exclusion list, which is required to be flagged as Incomplete Confidentiality Exclusions. The absence of such a list means that all types of disclosures are covered by the confidentiality obligation without carve-outs.",
+            "suggested_improvement": "Ensure confidentiality obligations survive termination and continue after contract expiration."
+          }
+        ],
+        "structured_parse_failed": false,
+        "legacy_text": "Issue: No Service Level Agreement\nSeverity: MEDIUM\nCategory: Enforceability Weakness\nLocation: Clause 4\nQuoted Text: Provider does not guarantee any level of uptime, availability, or performance. Customer's sole remedy for any service interruption is termination of this Agreement.\nRisk Explanation: The absence of a Service Level Agreement (SLA) means the customer has no contractual recourse for service interruptions other than termination.\nSuggested Improvement: Include an entire agreement clause to prevent extrinsic claims\n\nIssue: Incomplete Confidentiality Exclusions\nSeverity: MEDIUM\nCategory: Confidentiality Termination\nLocation: Clause 9\nQuoted Text: Each party shall hold the other's confidential information in confidence for a period of three (3) years.\nRisk Explanation: The confidentiality clause does not contain an explicit exclusion list, which is required to be flagged as Incomplete Confidentiality Exclusions. The absence of such a list means that all types of disclosures are covered by the confidentiality obligation without carve-outs.\nSuggested Improvement: Ensure confidentiality obligations survive termination and continue after contract expiration.",
+        "confidence_score": 0.7300000000000001,
+        "confidence_label": "MEDIUM",
+        "fallback_used": true,
+        "quality_warning": "",
+        "metadata": {
+          "model_name": "qwen2.5:3b-instruct",
+          "inference_duration_ms": 32250,
+          "parser_used": "json",
+          "fallback_used": true,
+          "semantic_suppressed": false,
+          "domain": "LEGAL",
+          "domain_confidence": 0.2002,
+          "policy_detection": "UNCLEAR",
+          "policy_type": "Institutional Notice",
+          "policy_confidence": 0.02,
+          "policy_explanation": "This document is an institutional notice, announcement, or official communication providing information rather than contractual terms.",
+          "policy_keywords": [
+            "term",
+            "obligation",
+            "grants",
+            "subscription",
+            "notice",
+            "refundable"
+          ],
+          "contractual_signals": [
+            "warranties",
+            "indemnification",
+            "shall be governed",
+            "limitation of liability",
+            "warrant",
+            "governing law",
+            "aggregate liability",
+            "indemnify",
+            "by and between",
+            "sole remedy"
+          ]
+        }
+      }
+    },
+    {
+      "doc_id": "VEN-03",
+      "pass": false,
+      "fail_reasons": [
+        "catastrophic_false_negative",
+        "missing 1/1 findings",
+        "2 false positive(s)"
+      ],
+      "parse_ok": true,
+      "issue_count": 2,
+      "tp": 0,
+      "fp": 2,
+      "fn": 1,
+      "gt_count": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "severity_accuracy": 1.0,
+      "title_accuracy": 1.0,
+      "exact_title_matches": 0,
+      "partial_title_matches": 0,
+      "title_mismatched_tps": 0,
+      "title_overlap_rate": 1.0,
+      "confidence_score": 0.7300000000000001,
+      "confidence_label": "MEDIUM",
+      "categories": [
+        "Liability Exposure",
+        "Confidentiality Termination"
+      ],
+      "false_positives": [
+        {
+          "issue_title": "Limitation of Liability",
+          "severity": "MEDIUM",
+          "category": "Liability Exposure"
+        },
+        {
+          "issue_title": "Incomplete Confidentiality Exclusions",
+          "severity": "MEDIUM",
+          "category": "Confidentiality Termination"
+        }
+      ],
+      "false_negatives": [
+        {
+          "expected_issue_title": "Consultant Retains All Deliverable IP",
+          "expected_severity": "HIGH",
+          "expected_category": "Intellectual Property",
+          "rationale": "Consultant retains full ownership of all deliverables created for and paid by Client. Client receives only a non-exclusive, internal-use license. This means Client cannot transfer, sell, or exclusively use the custom work they paid for. This is a significant IP risk that undermines the value of the services."
+        }
+      ],
+      "true_positives": [],
+      "raw_response": {
+        "success": true,
+        "model": "qwen2.5:3b-instruct",
+        "mode": "AUDIT",
+        "response_type": "audit",
+        "schema_version": 1,
+        "issue_count": 2,
+        "issues": [
+          {
+            "issue_title": "Limitation of Liability",
+            "severity": "MEDIUM",
+            "category": "Liability Exposure",
+            "location": "6",
+            "quoted_text": "Consultant's aggregate liability arising out of or relating to this Agreement shall not exceed the total fees paid by Client under the applicable SOW. In no event shall Consultant be liable for any indirect, incidental, special, consequential, or punitive damages.",
+            "risk_explanation": "The limitation of liability clause does not include a cap on specific types of damages such as indirect, incidental, special, consequential, or punitive damages, which could result in uncapped exposure to Client if these types of damages were to occur. This is a critical risk because it allows Consultant to avoid responsibility for certain types of losses that may be significant.",
+            "suggested_improvement": "Consultant shall not be liable for any indirect, incidental, special, consequential, or punitive damages."
+          },
+          {
+            "issue_title": "Incomplete Confidentiality Exclusions",
+            "severity": "MEDIUM",
+            "category": "Confidentiality Termination",
+            "location": "4",
+            "quoted_text": "Each party shall hold the other's confidential information in confidence for a period of five (5) years.",
+            "risk_explanation": "The confidentiality clause does not include an explicit list of exclusions or carve-outs, which could result in the confidentiality obligation being terminated prematurely if the parties later decide to terminate the agreement. This is a significant risk because it exposes Client to potential exposure for confidential information that was previously protected under the agreement.",
+            "suggested_improvement": "Ensure confidentiality obligations survive termination and continue after contract expiration."
+          }
+        ],
+        "structured_parse_failed": false,
+        "legacy_text": "Issue: Limitation of Liability\nSeverity: MEDIUM\nCategory: Liability Exposure\nLocation: 6\nQuoted Text: Consultant's aggregate liability arising out of or relating to this Agreement shall not exceed the total fees paid by Client under the applicable SOW. In no event shall Consultant be liable for any indirect, incidental, special, consequential, or punitive damages.\nRisk Explanation: The limitation of liability clause does not include a cap on specific types of damages such as indirect, incidental, special, consequential, or punitive damages, which could result in uncapped exposure to Client if these types of damages were to occur. This is a critical risk because it allows Consultant to avoid responsibility for certain types of losses that may be significant.\nSuggested Improvement: Consultant shall not be liable for any indirect, incidental, special, consequential, or punitive damages.\n\nIssue: Incomplete Confidentiality Exclusions\nSeverity: MEDIUM\nCategory: Confidentiality Termination\nLocation: 4\nQuoted Text: Each party shall hold the other's confidential information in confidence for a period of five (5) years.\nRisk Explanation: The confidentiality clause does not include an explicit list of exclusions or carve-outs, which could result in the confidentiality obligation being terminated prematurely if the parties later decide to terminate the agreement. This is a significant risk because it exposes Client to potential exposure for confidential information that was previously protected under the agreement.\nSuggested Improvement: Ensure confidentiality obligations survive termination and continue after contract expiration.",
+        "confidence_score": 0.7300000000000001,
+        "confidence_label": "MEDIUM",
+        "fallback_used": true,
+        "quality_warning": "",
+        "metadata": {
+          "model_name": "qwen2.5:3b-instruct",
+          "inference_duration_ms": 51556,
+          "parser_used": "json",
+          "fallback_used": true,
+          "semantic_suppressed": false,
+          "domain": "LEGAL",
+          "domain_confidence": 0.2897,
+          "policy_detection": "UNCLEAR",
+          "policy_type": "Institutional Notice",
+          "policy_confidence": 0.0175,
+          "policy_explanation": "This document is an institutional notice, announcement, or official communication providing information rather than contractual terms.",
+          "policy_keywords": [
+            "reimburse",
+            "term",
+            "effective date",
+            "obligation",
+            "grants",
+            "notice"
+          ],
+          "contractual_signals": [
+            "indemnification",
+            "shall be governed",
+            "limitation of liability",
+            "governing law",
+            "aggregate liability",
+            "indemnify",
+            "by and between",
+            "confidential information",
+            "this agreement",
+            "entire agreement"
+          ]
+        }
+      }
+    }
+  ]
+}
