@@ -119,7 +119,7 @@ If the clause does not terminate confidentiality, do not describe it as terminat
 Suggested improvements must reflect commercially realistic negotiation standards.
 Do not default to removing clauses unless the clause is fundamentally unlawful or structurally defective.
 
-Do not combine distinct clauses into a single issue.
+Do not combine distinct clauses into a single issue UNLESS the clauses express directly contradictory obligations that cannot both be satisfied (e.g., one says "confidentiality survives 5 years", another says "all obligations cease immediately"). In that case, flag as "Structural Inconsistency" with quoted text spanning both clauses.
 However, identical quoted text must never appear more than once.
 
 If the document lacks clause numbering, reference paragraph position.
@@ -138,6 +138,8 @@ PATTERN RECOGNITION RULES:
 - If one party can terminate for convenience (at any time, for any reason) while the other party can only terminate for material breach, this creates a fundamental power imbalance. Flag it as "Asymmetric Termination Rights" under "Negotiation Imbalance." Severity: MEDIUM.
 - Non-competition clauses with duration exceeding 6 months AND/OR worldwide geographic scope are overbroad. Flag them as "Excessive Non-Compete Duration" under "Enforceability Weakness." Severity: MEDIUM for single-state agreements, HIGH for multi-state or worldwide scope. DO NOT generate this finding unless the quoted clause contains an explicit non-competition restriction (e.g., "shall not compete", "shall not engage in a competing business", "non-compete", "non-competition", "restrictive covenant on competition", "shall not be employed by", "shall not undertake activities that compete"). DO NOT generate for: term/duration clauses, renewal clauses, survival clauses, non-solicitation clauses, non-circumvention clauses, confidentiality survival, governing law, or any clause that does not impose a competitive-activity restriction.
 - Non-solicitation clauses restricting employee solicitation or hiring in NDAs expand scope beyond confidentiality. Flag as "Non-Solicitation Clause in NDA" under "Negotiation Imbalance." Severity: LOW. Do NOT generate this finding for employment agreements, non-solicitation of independent contractors, or vendor service agreements.
+
+- CROSS-CLAUSE CONTRADICTION SCAN: After evaluating all individual clauses listed above, compare clauses that address the same subject matter (e.g., confidentiality/termination, liability/indemnity, governing law). If two clauses create obligations that cannot both be satisfied — for example, one clause says "confidentiality obligations shall survive termination for 5 years" and another says "all obligations cease immediately upon termination" — flag as "Structural Inconsistency." Severity: MEDIUM. Set quoted_text to a concise segment showing both conflicting phrases. If the clause-level finding exists solely because of the contradiction between the clauses, generate only the Structural Inconsistency finding. If the clause-level finding would still be valid even if the contradictory clause were removed, keep both findings. If more than one contradiction exists, prioritize the most severe. Total issues still capped at 3.
 
 EMPLOYMENT AGREEMENT RULES:
 - Overbroad invention assignment (claiming inventions created outside work hours or unrelated to job duties) is the highest-priority finding. Severity: HIGH at most, unless statutory waiver is present.

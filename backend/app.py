@@ -395,8 +395,27 @@ def ask(q: Query, response_format: Optional[str] = None):
                     structured["metadata"]["fallback_used"] = True
             # ---- Verifier Layer ----
             if session["mode"] == "AUDIT" and structured.get("response_type") == "audit":
+                logger.info(
+                    "[VerifierDebug] mode=%s response_type=%s issue_count_before=%s",
+                    session["mode"],
+                    structured.get("response_type"),
+                    len(structured.get("issues", [])),
+                )
+                logger.info(
+                    "[VerifierTextDebug] path=/ask text_len=%d has_AS_IS=%s has_TERMINATION=%s text_preview=%s",
+                    len(text) if text else 0,
+                    "AS IS" in text if text else "N/A",
+                    "TERMINATION FOR CONVENIENCE" in text if text else "N/A",
+                    (text[:500] if text else "NO TEXT"),
+                )
                 try:
                     verifier_issues = run_verifiers(text, structured.get("issues", []))
+                    logger.info(
+                        "[VerifierDebug] verifier_returned=%d",
+                        len(verifier_issues),
+                    )
+                    if not verifier_issues:
+                        logger.info("[VerifierDebug] No verifier findings")
                     if verifier_issues:
                         structured["issues"].extend(verifier_issues)
                         structured["issue_count"] = len(structured["issues"])
@@ -506,8 +525,20 @@ def ask(q: Query, response_format: Optional[str] = None):
                         structured["metadata"]["fallback_used"] = True
                 # ---- Verifier Layer ----
                 if session["mode"] == "AUDIT" and structured.get("response_type") == "audit":
+                    logger.info(
+                        "[VerifierDebug] mode=%s response_type=%s issue_count_before=%s",
+                        session["mode"],
+                        structured.get("response_type"),
+                        len(structured.get("issues", [])),
+                    )
                     try:
                         verifier_issues = run_verifiers(text, structured.get("issues", []))
+                        logger.info(
+                            "[VerifierDebug] verifier_returned=%d",
+                            len(verifier_issues),
+                        )
+                        if not verifier_issues:
+                            logger.info("[VerifierDebug] No verifier findings")
                         if verifier_issues:
                             structured["issues"].extend(verifier_issues)
                             structured["issue_count"] = len(structured["issues"])
@@ -925,8 +956,27 @@ def ask_file(
                     structured["metadata"]["fallback_used"] = True
             # ---- Verifier Layer ----
             if effective_mode == "AUDIT" and structured.get("response_type") == "audit":
+                logger.info(
+                    "[VerifierDebug] mode=%s response_type=%s issue_count_before=%s",
+                    effective_mode,
+                    structured.get("response_type"),
+                    len(structured.get("issues", [])),
+                )
+                logger.info(
+                    "[VerifierTextDebug] text_len=%d has_AS_IS=%s has_TERMINATION=%s text_preview=%s",
+                    len(text) if text else 0,
+                    "AS IS" in text if text else "N/A",
+                    "TERMINATION FOR CONVENIENCE" in text if text else "N/A",
+                    (text[:500] if text else "NO TEXT"),
+                )
                 try:
                     verifier_issues = run_verifiers(text, structured.get("issues", []))
+                    logger.info(
+                        "[VerifierDebug] verifier_returned=%d",
+                        len(verifier_issues),
+                    )
+                    if not verifier_issues:
+                        logger.info("[VerifierDebug] No verifier findings")
                     if verifier_issues:
                         structured["issues"].extend(verifier_issues)
                         structured["issue_count"] = len(structured["issues"])

@@ -601,9 +601,53 @@ def build_audit_json_payload(
         )
 
     if not parse_failed:
+        # --- ContradictionTrace: snapshot before ---
+        if issues:
+            issue_summaries = []
+            for i, iss in enumerate(issues):
+                summary = "idx=%d title='%s' cat='%s' sev='%s' qt='%s' exp='%s'" % (
+                    i,
+                    (iss.issue_title or "")[:60],
+                    (iss.category or "")[:30],
+                    (iss.severity or "")[:10],
+                    (iss.quoted_text or "")[:80],
+                    (iss.risk_explanation or "")[:80],
+                )
+                issue_summaries.append(summary)
+            logger.info(
+                "[ContradictionTrace] issues_before_contradiction=[%s]",
+                " | ".join(issue_summaries),
+            )
+        else:
+            logger.info("[ContradictionTrace] issues_before_contradiction=[]")
+
         contradictions = validate_contradictions(issues, user_input)
         if contradictions:
+            for c in contradictions:
+                logger.info(
+                    "[ContradictionTrace] contradiction_found idx=%d type=%s reason=%s",
+                    c.issue_index, c.contradiction_type, c.reason,
+                )
+            issues_before_list = list(issues)
             issues = apply_contradiction_suppression(issues, contradictions)
+            suppressed_count = len(issues_before_list) - len(issues)
+            if suppressed_count:
+                for c in contradictions:
+                    if c.has_contradiction and c.suppressed:
+                        orig_title = (issues_before_list[c.issue_index].issue_title
+                                      if c.issue_index < len(issues_before_list) else "?")[:60]
+                        orig_cat = (issues_before_list[c.issue_index].category
+                                    if c.issue_index < len(issues_before_list) else "?")[:30]
+                        logger.info(
+                            "[ContradictionTrace] SUPPRESSED idx=%d type=%s title='%s' cat='%s' suppressed_reason='%s'",
+                            c.issue_index,
+                            c.contradiction_type,
+                            orig_title,
+                            orig_cat,
+                            c.reason,
+                        )
+        else:
+            logger.info("[ContradictionTrace] no_contradictions_detected")
 
         elevated_count = classify_document_contradictions(issues, user_input)
         if elevated_count:
@@ -611,6 +655,8 @@ def build_audit_json_payload(
                 "[ContradictionClassification] Elevated %d issue(s) to Structural Inconsistency in pipeline",
                 elevated_count
             )
+        else:
+            logger.info("[ContradictionTrace] no_elevations_applied")
     normalization_ms = (time.time() - norm_start) * 1000
 
     # --- Input Quality ---

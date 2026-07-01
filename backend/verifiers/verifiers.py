@@ -5,10 +5,12 @@ and returns a finding dict if the pattern is present.
 
 import re
 from typing import Optional
+from backend.logger import logger
 
 
 def verify_as_is_no_warranty(doc_text: str) -> Optional[dict]:
     """Detect AS-IS / No Warranty provisions in paid service agreements."""
+    logger.info("[VerifierTrace] ENTER verify_as_is_no_warranty")
     as_is_patterns = [
         r'(?i)AS\s+IS',
         r'(?i)AS\s+AVAILABLE',
@@ -25,13 +27,20 @@ def verify_as_is_no_warranty(doc_text: str) -> Optional[dict]:
         ['AS IS', 'AS AVAILABLE', 'NO WARRANT'],
     )
     if not section_text:
+        logger.info("[VerifierTrace] as_is_no_warranty -> None: _find_section_for_patterns returned None")
         return None
+    logger.info("[VerifierTrace] as_is_no_warranty section found (first 200): %s", section_text[:200])
     has_as_is = any(re.search(p, section_text) for p in as_is_patterns)
     has_no_warranty = any(re.search(p, section_text) for p in no_warranty_patterns)
     if not (has_as_is and has_no_warranty):
+        logger.info(
+            "[VerifierTrace] as_is_no_warranty -> None: has_as_is=%s has_no_warranty=%s",
+            has_as_is, has_no_warranty,
+        )
         return None
     quoted_lines = _extract_quoted_lines(section_text, 4)
     if not quoted_lines:
+        logger.info("[VerifierTrace] as_is_no_warranty -> None: _extract_quoted_lines returned empty")
         return None
     return {
         "issue_title": "AS-IS No Warranty Provision",
@@ -57,6 +66,7 @@ def verify_as_is_no_warranty(doc_text: str) -> Optional[dict]:
 
 def verify_asymmetric_termination(doc_text: str) -> Optional[dict]:
     """Detect asymmetric termination rights favoring one party."""
+    logger.info("[VerifierTrace] ENTER verify_asymmetric_termination")
     lines = doc_text.split('\n')
     convenience_line_idx = None
     breach_line_idx = None
@@ -66,14 +76,26 @@ def verify_asymmetric_termination(doc_text: str) -> Optional[dict]:
         if re.search(r'(?i)\bterminate\b.*\bonly for\b.*\bbreach\b', line) or \
            re.search(r'(?i)\bonly\b.*\bif\b.*\bbreach\b', line):
             breach_line_idx = i
-    if convenience_line_idx is None or breach_line_idx is None:
+    if convenience_line_idx is None:
+        logger.info("[VerifierTrace] asymmetric_termination -> None: convenience_line_idx is None")
         return None
+    if breach_line_idx is None:
+        logger.info("[VerifierTrace] asymmetric_termination -> None: breach_line_idx is None")
+        return None
+    logger.info(
+        "[VerifierTrace] asymmetric_termination indices: convenience=%s breach=%s",
+        convenience_line_idx, breach_line_idx,
+    )
     if convenience_line_idx == breach_line_idx:
-        quoted = _extract_quoted_lines('\n'.join(lines[max(0, convenience_line_idx-1):min(len(lines), convenience_line_idx+1)]), 1)
+        candidate = '\n'.join(lines[max(0, convenience_line_idx-1):min(len(lines), convenience_line_idx+1)])
+        logger.info("[VerifierTrace] asymmetric_termination candidate (first 200): %s", candidate[:200])
+        quoted = _extract_quoted_lines(candidate, 1)
     else:
-        combined = '\n'.join(lines[max(0, min(convenience_line_idx, breach_line_idx)-1):max(len(lines), max(convenience_line_idx, breach_line_idx)+1)])
-        quoted = _extract_quoted_lines(combined, 2)
+        candidate = '\n'.join(lines[max(0, min(convenience_line_idx, breach_line_idx)-1):max(len(lines), max(convenience_line_idx, breach_line_idx)+1)])
+        logger.info("[VerifierTrace] asymmetric_termination candidate (first 200): %s", candidate[:200])
+        quoted = _extract_quoted_lines(candidate, 2)
     if not quoted:
+        logger.info("[VerifierTrace] asymmetric_termination -> None: _extract_quoted_lines returned empty")
         return None
     quoted = _label_quoted_text(quoted, "Asymmetric termination rights clause")
     return {
@@ -101,13 +123,16 @@ def verify_asymmetric_termination(doc_text: str) -> Optional[dict]:
 
 def verify_single_trigger_coc(doc_text: str) -> Optional[dict]:
     """Detect single-trigger Change of Control acceleration provisions."""
+    logger.info("[VerifierTrace] ENTER verify_single_trigger_coc")
     coc_section = _find_section_for_patterns(
         doc_text,
         ['Change of Control', 'change of control', 'CHANGE OF CONTROL'],
         ['Change of Control', 'CIC', 'acquisition', 'merger'],
     )
     if not coc_section:
+        logger.info("[VerifierTrace] single_trigger_coc -> None: _find_section_for_patterns returned None")
         return None
+    logger.info("[VerifierTrace] single_trigger_coc section found (first 200): %s", coc_section[:200])
     is_single_trigger = (
         re.search(r'(?i)immediately\s+accelerate', coc_section) or
         re.search(r'(?i)become\s+fully\s+vested', coc_section) or
@@ -115,14 +140,17 @@ def verify_single_trigger_coc(doc_text: str) -> Optional[dict]:
         re.search(r'(?i)upon\s+(a\s+)?change of control.*accelerat', coc_section)
     )
     if not is_single_trigger:
+        logger.info("[VerifierTrace] single_trigger_coc -> None: is_single_trigger=False")
         return None
     equity_is_double_trigger = (
         re.search(r'(?i)if.*(employ|terminat).*accelerat|accelerat.*only.*if', coc_section)
     )
     if equity_is_double_trigger:
+        logger.info("[VerifierTrace] single_trigger_coc -> None: equity_is_double_trigger=True")
         return None
     quoted = _extract_quoted_lines(coc_section, 4)
     if not quoted:
+        logger.info("[VerifierTrace] single_trigger_coc -> None: _extract_quoted_lines returned empty")
         return None
     return {
         "issue_title": "Single-Trigger Change of Control Acceleration",

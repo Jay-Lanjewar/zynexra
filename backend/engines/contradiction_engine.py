@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import List, Set
 import re
 
+from backend.engines.response_schemas import AuditIssue
 from backend.logger import logger
 
 
@@ -50,7 +51,7 @@ PROHIBITED_CATEGORIES = {
 
 DURATION_INSUFFICIENCY_CUES = [
     re.compile(r"(?i)\b(?:duration|period|time\s*frame|timeframe|length)\s+(?:is\s+)?(?:insufficient|inadequate|too\s+short|too\s+brev)"),
-    re.compile(r"(?i)\b(?:does\s+not\s+specify|fails?\s+to\s+specify|lacks?)\s+(?:a\s+)?(?:duration|period|time\s*limit|time\s*frame)"),
+    re.compile(r"(?i)\b(?:does\s+not\s+specify|fails?\s+to\s+specify|lacks?)\s+(?:(?:a|an|any|the)\s+(?:\w+\s+)?)?(?:duration|period|time\s*(?:limit|frame|period)|survival\s+period|length|expiration\s*date|end\s*date)"),
     re.compile(r"(?i)\b(?:no\s+)?(?:specified|defined|stated)\s+(?:duration|period|end\s*date|termination\s*date)"),
     re.compile(r"(?i)\b(?:survival\s+)?(?:period|duration)\s+(?:is\s+)?(?:unspecified|undefined|not\s+stated|missing)"),
     re.compile(r"(?i)\b(?:indefinite|perpetual|permanent)\s+(?:obligation|duty|commitment|survival)"),
@@ -156,6 +157,14 @@ class ContradictionResult:
         }
 
 
+@dataclass
+class DocumentContradictionResult:
+    """Result of scanning a document for survival/termination clause contradictions."""
+    conflicting_domains: Set[str] = field(default_factory=set)
+    survival_clauses: List[str] = field(default_factory=list)
+    termination_clauses: List[str] = field(default_factory=list)
+
+
 def _has_survival_language(text: str) -> bool:
     if not text:
         return False
@@ -199,6 +208,8 @@ def _check_semantic_contradiction(quoted_text: str, risk_explanation: str) -> bo
     has_termination = bool(termination_indicators.search(risk_explanation))
 
     if has_missing:
+        if _references_duration_insufficiency(risk_explanation):
+            return False
         return True
 
     if has_termination and not _references_duration_insufficiency(risk_explanation):
@@ -431,36 +442,109 @@ CONTRADICTION_INCOMPATIBLE_CATEGORIES = {
 }
 
 
-def _scan_document_contradictions(document_text: str) -> Set[str]:
+def _split_into_clauses(document_text: str) -> List[str]:
+    """Split document text into logical clauses for contradiction scanning.
+
+    Uses multiple strategies to handle different extraction formats:
+    1. Blank-line separation (PDF/text extracts with paragraph breaks)
+    2. Section heading boundaries (DOCX extracts)
+
+    A clause is a logical section of the document, typically a numbered
+    section with its content. When no structure can be detected, the
+    entire document is returned as a single clause rather than splitting
+    individual lines.
+    """
+    if not document_text:
+        return []
+
+    # Strategy 1: blank-line separation (standard text/PDF extracts)
+    clauses = [c.strip() for c in re.split(r'\n\s*\n+', document_text) if c.strip()]
+    if len(clauses) >= 2:
+        # Verify that survival and termination land in different clauses.
+        # If both are in the same clause, the blank-line split under-split
+        # a DOCX extract — fall through to heading-based splitting.
+        surv = [c for c in clauses if _has_survival_language(c)]
+        term = [c for c in clauses if _has_termination_language(c)]
+        if surv and term and surv[0] != term[0]:
+            return clauses
+
+    # Strategy 2: detect section/heading boundaries (DOCX extracts).
+    # A new section begins with a numbered heading or section marker.
+    # All following lines belong to that section until the next heading.
+    section_re = re.compile(
+        r'^\d+(?:\.\d+)*[\.\)]\s+[A-Z]'
+        r'|(?:Section|Article|Clause|Paragraph)\s+\d+'
+        r'|(?:EXHIBIT|APPENDIX|SCHEDULE)\s+[A-Z]',
+        re.MULTILINE
+    )
+
+    lines = document_text.split('\n')
+    clauses = []
+    current: List[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if section_re.match(stripped):
+            if current:
+                clauses.append(' '.join(current))
+            current = [stripped]
+        else:
+            current.append(stripped)
+
+    if current:
+        clauses.append(' '.join(current))
+
+    # Fallback: no structure detected — return entire document as one clause.
+    # It is preferable to miss a contradiction than to split arbitrarily.
+    if len(clauses) < 2:
+        stripped = document_text.strip()
+        return [stripped] if stripped else []
+
+    return clauses
+
+
+def _scan_document_contradictions(document_text: str) -> DocumentContradictionResult:
     """
     Scan full document text for contradictory clauses where one clause
     says an obligation survives termination and another says it terminates
     in the same obligation domain.
 
-    Returns set of domain regex patterns that are in conflict.
+    Returns a DocumentContradictionResult with the conflicting domains,
+    survival clauses, and termination clauses found in the document.
     """
     if not document_text or not document_text.strip():
-        return set()
+        return DocumentContradictionResult()
 
-    clauses = [c.strip() for c in re.split(r'\n\s*\n+', document_text) if c.strip()]
+    clauses = _split_into_clauses(document_text)
     if len(clauses) < 2:
-        return set()
+        return DocumentContradictionResult()
 
     survival_domains: Set[str] = set()
     termination_domains: Set[str] = set()
+    survival_clauses: List[str] = []
+    termination_clauses: List[str] = []
 
     for clause in clauses:
         if _has_survival_language(clause):
             survival_domains.update(_extract_obligation_domains(clause))
+            survival_clauses.append(clause)
         if _has_termination_language(clause):
             termination_domains.update(_extract_obligation_domains(clause))
+            termination_clauses.append(clause)
 
-    return survival_domains & termination_domains
+    return DocumentContradictionResult(
+        conflicting_domains=survival_domains & termination_domains,
+        survival_clauses=survival_clauses,
+        termination_clauses=termination_clauses,
+    )
 
 
 def classify_document_contradictions(issues: list, document_text: str = "") -> int:
     """
-    Elevate issues involved in document-level contradictions to Structural Inconsistency.
+    Elevate issues involved in document-level contradictions to Structural Inconsistency,
+    or generate a new issue directly when no compatible issue exists.
 
     Detects contradictions both between existing issues and by scanning the full document.
     For each contradictory issue:
@@ -468,24 +552,67 @@ def classify_document_contradictions(issues: list, document_text: str = "") -> i
       - Sets contradiction_detected -> True
       - Preserves original category in original_category
 
-    Returns the number of elevated issues.
+    When a document-level contradiction is detected but no existing issue domain
+    overlaps with the conflicting domains, a new Structural Inconsistency issue
+    is created directly from the conflicting clause excerpts.
+
+    Returns the number of elevated or generated issues.
     """
     # 1. Find contradictions between existing issues
     conflict_indices = _find_document_level_conflicts(issues)
 
     # 2. Scan full document for clause-level contradictions not yet captured
     has_document_conflict = False
+    scan_result = DocumentContradictionResult()
     if document_text:
-        conflicting_domains = _scan_document_contradictions(document_text)
-        if conflicting_domains:
+        scan_result = _scan_document_contradictions(document_text)
+        if scan_result.conflicting_domains:
             has_document_conflict = True
             for idx, issue in enumerate(issues):
                 combined = " ".join(filter(None, [
                     issue.category, issue.quoted_text, issue.risk_explanation
                 ]))
                 issue_domains = _extract_obligation_domains(combined)
-                if issue_domains & conflicting_domains:
+                if issue_domains & scan_result.conflicting_domains:
                     conflict_indices.add(idx)
+
+    # 2b. Generate a new Structural Inconsistency issue if a document-level
+    #     contradiction was detected but no existing issue domain overlaps
+    #     with the conflicting domains.
+    generated_new_issue = False
+    if has_document_conflict and not conflict_indices and document_text:
+        if (scan_result.survival_clauses and scan_result.termination_clauses
+                and scan_result.survival_clauses[0] != scan_result.termination_clauses[0]):
+            quoted = " | ".join(
+                [scan_result.survival_clauses[0][:300]]
+                + [scan_result.termination_clauses[0][:300]]
+            )
+            new_issue = AuditIssue(
+                issue_title="Structural Inconsistency",
+                category="Structural Inconsistency",
+                severity="MEDIUM",
+                location="Multiple sections",
+                quoted_text=quoted,
+                risk_explanation=(
+                    "The contract contains contradictory language across different sections: "
+                    "one clause specifies that certain obligations survive termination "
+                    "for a defined period, while another clause states that all obligations "
+                    "cease immediately upon termination. These provisions cannot both be "
+                    "satisfied simultaneously."
+                ),
+                suggested_improvement=(
+                    "Resolve the contradiction by specifying whether the obligations "
+                    "survive termination or cease immediately, and ensure consistent "
+                    "language across all related clauses."
+                ),
+            )
+            issues.append(new_issue)
+            conflict_indices.add(len(issues) - 1)
+            generated_new_issue = True
+            logger.info(
+                "[ContradictionClassification] Generated Structural Inconsistency issue "
+                "(document-level contradiction detected, no existing issue to elevate)"
+            )
 
     # 3. Early exit if no conflict detected at all
     if not conflict_indices:
@@ -521,9 +648,12 @@ def classify_document_contradictions(issues: list, document_text: str = "") -> i
                     idx, issue.original_category
                 )
 
+    if generated_new_issue:
+        elevated_count += 1
+
     if elevated_count:
         logger.info(
-            "[ContradictionClassification] Total issues elevated: %d",
+            "[ContradictionClassification] Total issues elevated/generated: %d",
             elevated_count
         )
 
