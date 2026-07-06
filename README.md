@@ -2,6 +2,9 @@
 
 **Zynexra** is a privacy-first offline AI system for analyzing legal documents and identifying structural risks in contracts. It runs entirely **locally** using Ollama-hosted language models with deterministic post-processing and validation for stable outputs.
 
+**Current Version:** v0.2.0  
+**Latest Stable Benchmark:** Composite 88.00 (TP: 10 | FP: 6 | FN: 0)
+
 ---
 
 ## Features
@@ -10,9 +13,11 @@
 - **Redaction Mode** — Detects and redacts PII (names, emails, phones, addresses, companies).
 - **Advisory Mode** — Answers legal-practice questions with context-aware responses.
 - **Confidence Scoring** — Multi-factor confidence system with quality/domain-aware caps.
-- **Contradiction Detection** — Flags survival-clause vs category mismatches automatically.
+Contradiction Detection — Detects semantic contradictions, finite-duration inconsistencies, and cross-clause structural conflicts.
 - **OCR Degradation Detection** — Identifies corrupted/noisy text and suppresses unreliable analysis.
 - **Legal-Domain Guard** — Prevents hallucinated legal analysis on non-legal content (recipes, essays, etc.).
+- **Cross-Clause Consistency Analysis** — Detects contradictory obligations across multiple clauses and reports Structural Inconsistency findings.
+- **Verifier Layer** — Rule-based post-processing validates specific legal patterns and supplements LLM findings.
 
 ---
 
@@ -190,6 +195,21 @@ See `docs/ARCHITECTURE.md` for the full architecture documentation.
 
 ---
 
+## Benchmark
+
+Current stable benchmark (v0.2.0):
+
+| Metric | Value |
+|--------|------:|
+| Composite | **88.00** |
+| True Positives | **10** |
+| False Positives | **6** |
+| False Negatives | **0** |
+
+The benchmark corpus is used to detect regressions and evaluate prompt and pipeline changes.
+
+---
+
 ## Design Principles
 
 - **Privacy First** — All processing is local; no data leaves the machine.
@@ -207,4 +227,8 @@ Zynexra was created by **Jay Lanjewar**.
 
 ## Status
 
-Current stage: **Prototype / Pilot Testing**
+Current stage: Beta (v0.2.0)
+
+- Stable benchmark baseline established
+- Regression testing enabled
+- Active development continues toward v0.3.0
