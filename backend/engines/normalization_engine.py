@@ -785,6 +785,11 @@ def build_audit_json_payload(
         doc_text=user_input,
         policy_detected=policy_detected,
         non_legal_detected=non_legal_detected,
+        domain_confidence=(
+            cached_domain_result.confidence
+            if cached_domain_result is not None
+            else 0.0
+        ),
     )
 
     if domain_suppressed:
