@@ -1552,7 +1552,8 @@ def normalize_audit_issue_fields(issues: List[AuditIssue]) -> List[AuditIssue]:
             )
 
         if "confidentiality" in category_lower:
-            issue.suggested_improvement = "Ensure confidentiality obligations survive termination and continue after contract expiration."
+            if not _INCOMPLETE_EXCLUSION_TITLE_RE.search(issue.issue_title or ""):
+                issue.suggested_improvement = "Ensure confidentiality obligations survive termination and continue after contract expiration."
 
         if "indemnification" in category_lower and unlimited_tokens.search(issue.quoted_text or ""):
             issue.suggested_improvement = (
