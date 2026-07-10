@@ -62,11 +62,10 @@ class AuditConfidenceScorer:
     }
 
     VALID_CATEGORIES = {
-        "confidentiality", "indemnification", "termination", "liability",
-        "governing_law", "intellectual_property", "non_competition",
-        "non_solicitation", "dispute_resolution", "compliance",
-        "warranty", "force_majeure", "assignment", "severability",
-        "entire_agreement", "amendment", "notice", "miscellaneous",
+        "structural inconsistency", "indemnification", "liability exposure",
+        "governing law", "residuals", "enforceability weakness",
+        "negotiation imbalance", "privacy risk", "confidentiality termination",
+        "intellectual property", "restrictive covenants",
     }
 
     REFUSAL_PATTERNS = [
