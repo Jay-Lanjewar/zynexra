@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     # Extracted text character limit
     MAX_TEXT_LENGTH: int = 500000
 
+    # OCR fallback settings
+    OCR_ENABLED: bool = True
+    OCR_DPI: int = 300
+    OCR_MIN_CHARS_PER_PAGE: int = 50
+    OCR_BAD_PAGE_RATIO: float = 0.20
+
     class Config:
         env_file = ".env"
 
