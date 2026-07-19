@@ -547,7 +547,7 @@ def build_audit_json_payload(
     duplicate_suppressed = 0
     if parsed_issues is not None:
         issues = parsed_issues
-        parse_failed = len(issues) == 0
+        parse_failed = False
         if parse_failed:
             logger.info("[FallbackTrace] stage=parse_failed (pre-parsed) fallback_used=%s", fallback_used)
     else:

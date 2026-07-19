@@ -924,9 +924,14 @@ def ask_file(
             )
 
         validation_start = time.time()
-        validation_result = validation_engine.validate_response(
-            complete_response,
-            validation_context
+        # In JSON mode, an empty legacy_text is valid when parsing succeeded
+        # and all issues were suppressed during normalization — don't reject it.
+        if json_response_mode and not complete_response:
+            validation_result = ValidationResult(is_valid=True)
+        else:
+            validation_result = validation_engine.validate_response(
+                complete_response,
+                validation_context
             )
         validation_ms = (time.time() - validation_start) * 1000
         log_timing("Validation", validation_start)
