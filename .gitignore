@@ -48,6 +48,13 @@ tests/*assessment*.md
 tests/validation_corpus/phase1_results_*.json
 tests/validation_corpus/phase1_traces_*.json
 tests/validation_corpus/ab_experiment_results.json
+tests/validation_corpus/variance_test_results.json
+
+# pytest cache
+.pytest_cache/
+
+# Generated data
+data/
 
 # Session files
 .anchored_summary.md

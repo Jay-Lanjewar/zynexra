@@ -126,25 +126,4 @@ def test_same_survival_and_termination_clause():
     """When both languages appear in same clause, no contradiction reported."""
     doc = f"{PREAMBLE}\n\nBoth survive termination and immediately cease in one paragraph.\n\n"
     result = _scan_document_contradictions(doc)
-    # Result may or may not detect, but should not crash
     assert isinstance(result.conflicting_domains, set)
-
-
-if __name__ == "__main__":
-    test_blank_line_format()
-    print("PASS: blank_line_format")
-    test_single_newline_format()
-    print("PASS: single_newline_format")
-    test_mixed_format()
-    print("PASS: mixed_format")
-    test_no_contradiction()
-    print("PASS: no_contradiction")
-    test_only_termination()
-    print("PASS: only_termination")
-    test_empty_document()
-    print("PASS: empty_document")
-    test_short_document()
-    print("PASS: short_document")
-    test_same_survival_and_termination_clause()
-    print("PASS: same_survival_and_termination_clause")
-    print("\nAll tests passed!")
