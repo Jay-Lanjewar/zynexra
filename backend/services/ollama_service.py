@@ -53,15 +53,15 @@ class OllamaService:
         (e.g. text-only /ask endpoint), it is returned as {}.
         """
         try:
-            result = self._generate_with_model(messages, model, mode, document_meta) + (False,)
+            response_text, analysis_metadata = self._generate_with_model(messages, model, mode, document_meta)
             logger.info("[FallbackTrace] stage=ollama_service_success fallback_used=False")
-            return result
+            return response_text, False, analysis_metadata
         except HTTPException as e:
             if self._should_fallback(e):
                 logger.warning("Model fallback activated. Switching to %s", settings.MODEL_FALLBACK)
-                result = self._generate_with_model(messages, settings.MODEL_FALLBACK, mode, document_meta) + (True,)
+                response_text, analysis_metadata = self._generate_with_model(messages, settings.MODEL_FALLBACK, mode, document_meta)
                 logger.warning("[FallbackTrace] stage=ollama_service_fallback fallback_used=True")
-                return result
+                return response_text, True, analysis_metadata
             raise
 
     def _should_fallback(self, error: HTTPException) -> bool:
