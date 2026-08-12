@@ -227,6 +227,8 @@ class RedactionEngine:
 
     def detect_entities(self, text: str, options: RedactionOptions) -> List[RedactionEntry]:
         candidates: List[RedactionEntry] = []
+        rejected_people: List[Tuple[str, int, int, float]] = []
+        base_by_entry: Dict[int, str] = {}
         enabled = {
             "EMAIL": options.emails,
             "PHONE": options.phones,
@@ -255,20 +257,23 @@ class RedactionEngine:
                         candidate_confidence,
                     )
                     if rejection_reason:
+                        rejected_people.append((original, match.start(), match.end(), candidate_confidence))
                         self._log_rejected_person(original, rejection_reason)
                         continue
-                candidates.append(
-                    RedactionEntry(
-                        entity_type=candidate_type,
-                        original_text=original,
-                        replacement=f"[REDACTED_{candidate_type}]",
-                        confidence=candidate_confidence,
-                        start=match.start(),
-                        end=match.end(),
-                    )
+                entry = RedactionEntry(
+                    entity_type=candidate_type,
+                    original_text=original,
+                    replacement=f"[REDACTED_{candidate_type}]",
+                    confidence=candidate_confidence,
+                    start=match.start(),
+                    end=match.end(),
                 )
+                base_by_entry[id(entry)] = entity_type
+                candidates.append(entry)
 
-        return self._dedupe_overlaps(candidates)
+        selected = self._dedupe_overlaps(candidates)
+        base_types = {(entry.start, entry.end): base_by_entry[id(entry)] for entry in selected}
+        return self._reconcile_repeated_entities(selected, rejected_people, base_types)
 
     def apply_redactions(self, text: str, entities: List[RedactionEntry]) -> str:
         redacted = text
@@ -295,6 +300,71 @@ class RedactionEngine:
 
     def _ranges_overlap(self, left: range, right: range) -> bool:
         return left.start < right.stop and right.start < left.stop
+
+    def _reconcile_repeated_entities(
+        self,
+        selected: List[RedactionEntry],
+        rejected_people: List[Tuple[str, int, int, float]],
+        base_types: Dict[Tuple[int, int], str],
+    ) -> List[RedactionEntry]:
+        accepted_by_key: Dict[str, List[RedactionEntry]] = {}
+        rejected_by_key: Dict[str, List[Tuple[str, int, int, float]]] = {}
+        for entry in selected:
+            accepted_by_key.setdefault(self._entity_identity_key(entry.original_text), []).append(entry)
+        for rejected in rejected_people:
+            rejected_by_key.setdefault(self._entity_identity_key(rejected[0]), []).append(rejected)
+
+        repeated_keys = {
+            key
+            for key in set(accepted_by_key) | set(rejected_by_key)
+            if len(accepted_by_key.get(key, [])) + len(rejected_by_key.get(key, [])) >= 2
+        }
+
+        for key in repeated_keys:
+            members = accepted_by_key.get(key, [])
+            rejected = rejected_by_key.get(key, [])
+            if not members:
+                continue
+            entity_type = self._resolve_group_entity_type(members, base_types)
+            occupied = [range(entry.start, entry.end) for entry in selected]
+            for original, start, end, confidence in rejected:
+                candidate_range = range(start, end)
+                if any(self._ranges_overlap(candidate_range, existing) for existing in occupied):
+                    continue
+                selected.append(
+                    RedactionEntry(
+                        entity_type=entity_type,
+                        original_text=original,
+                        replacement=f"[REDACTED_{entity_type}]",
+                        confidence=confidence,
+                        start=start,
+                        end=end,
+                    )
+                )
+                occupied.append(candidate_range)
+            for entry in members:
+                entry.entity_type = entity_type
+                entry.replacement = f"[REDACTED_{entity_type}]"
+
+        return sorted(selected, key=lambda item: item.start)
+
+    def _resolve_group_entity_type(
+        self,
+        members: List[RedactionEntry],
+        base_types: Dict[Tuple[int, int], str],
+    ) -> str:
+        if any(base_types.get((entry.start, entry.end)) == "PERSON" for entry in members):
+            return "PERSON"
+        entity_types = {entry.entity_type for entry in members}
+        if len(entity_types) == 1:
+            return next(iter(entity_types))
+        counts: Dict[str, int] = {}
+        for entry in members:
+            counts[entry.entity_type] = counts.get(entry.entity_type, 0) + 1
+        return min(counts, key=lambda entity_type: (-counts[entity_type], self.PRIORITY[entity_type]))
+
+    def _entity_identity_key(self, candidate: str) -> str:
+        return " ".join(candidate.strip().strip(".,:;()[]\"'?!").lower().split())
 
     def _classify_person_candidate(
         self,
