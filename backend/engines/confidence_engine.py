@@ -323,10 +323,22 @@ class AdvisoryConfidenceScorer:
         "no_hallucination_warning": 0.15,
     }
 
+    # Hard refusals: the model declines to answer at all. Legal disclaimers
+    # (e.g. "not legal advice", "consult a lawyer") are NOT refusals -- see
+    # DISCLAIMER_PATTERNS -- and must never lower confidence in ADVISORY mode.
     REFUSAL_PATTERNS = [
         re.compile(r"(?i)\b(?:I cannot|I can't|I am unable|I'm unable)"),
+        re.compile(r"(?i)\b(?:cannot assist|can't help|won't help)"),
+        re.compile(r"(?i)\b(?:I refuse|I will not answer)"),
+    ]
+
+    # Responsible disclaimers that accompany otherwise-substantive legal
+    # answers. Expected in ADVISORY mode; intentionally not treated as refusals
+    # and not penalized.
+    DISCLAIMER_PATTERNS = [
         re.compile(r"(?i)\b(?:I am not a lawyer|I am not an attorney|not legal advice)"),
         re.compile(r"(?i)\b(?:consult a lawyer|consult an attorney|seek legal counsel)"),
+        re.compile(r"(?i)\b(?:seek professional legal advice|for informational purposes only)"),
     ]
 
     LEGAL_TOPIC_KEYWORDS = [
@@ -344,12 +356,37 @@ class AdvisoryConfidenceScorer:
         re.compile(r"(?i)\b(?:I would recommend|you should consider)"),
     ]
 
+    # Genuine uncertainty/verifiability warnings. Ordinary hedging ("probably",
+    # "I believe", "might be") is appropriate epistemic caution in legal advice
+    # and is NOT penalized.
     HALLUCINATION_PATTERNS = [
-        re.compile(r"(?i)\b(?:I believe|I think|it seems like|probably)"),
-        re.compile(r"(?i)\b(?:may or may not|could potentially|might be)"),
-        re.compile(r"(?i)\b(?:to the best of my knowledge|as far as I know)"),
+        re.compile(r"(?i)\b(?:to the best of my knowledge|as far as I know|I cannot verify|I am not certain)"),
+        re.compile(r"(?i)\b(?:may not be accurate|information may be inaccurate|details may be incorrect)"),
     ]
 
+    # Phrases indicating the model assessed the subject rather than declined
+    # to answer. A genuine decline typically does not use these.
+    ANSWER_MARKERS = re.compile(
+        r"(?i)\b(?:is (?:generally |likely )?enforceable|is unenforceable|is void|is valid|"
+        r"appears? (?:to be|enforceable)|you (?:should|can|may|must)|is likely|the clause is)\b"
+    )
+
+    # Canonical caveat shape: refusal phrase followed by a contrastive
+    # continuation ("I cannot give a definitive answer, but ...").
+    CONTRASTIVE_CONTINUATION = re.compile(
+        r"(?i)\b(?:but|however|that said|that being said|nevertheless|in general|generally)\b"
+    )
+
+    # Tails that redirect to a professional instead of answering. A contrastive
+    # continuation that is only a redirect does NOT count as an answer.
+    REDIRECT_TAIL = re.compile(
+        r"(?i)\b(?:please consult|consult (?:a|an|your) (?:lawyer|attorney)|"
+        r"seek (?:legal|professional) (?:counsel|advice)|contact a (?:lawyer|attorney)|I(?:'m| am) sorry)\b"
+    )
+
+    # Any genuine refusal is capped to LOW confidence: a refusal contains
+    # nothing to be confident about.
+    REFUSAL_MAX_SCORE = 0.40
     QUALITY_CAP_MAX_SCORE = 0.30
     FALLBACK_DEGRADED_CAP_MAX_SCORE = 0.25
 
@@ -359,6 +396,9 @@ class AdvisoryConfidenceScorer:
 
         refusal_score = self._compute_refusal_score(response_text)
         factors["refusal_absent"] = refusal_score
+
+        if any(pattern.search(response_text) for pattern in self.DISCLAIMER_PATTERNS):
+            logger.debug("[Confidence] ADVISORY -> disclaimer present (not penalized)")
 
         legal_score = self._compute_legal_relevance(response_text, user_query)
         factors["legal_topic_relevance"] = legal_score
@@ -391,6 +431,13 @@ class AdvisoryConfidenceScorer:
                 score, self.QUALITY_CAP_MAX_SCORE,
             )
 
+        if refusal_score == 0.0:
+            score = min(score, self.REFUSAL_MAX_SCORE)
+            logger.warning(
+                "[Confidence] ADVISORY -> refusal detected: score capped to %.2f (LOW)",
+                self.REFUSAL_MAX_SCORE,
+            )
+
         label = _label_from_score(score)
 
         logger.info(
@@ -401,10 +448,21 @@ class AdvisoryConfidenceScorer:
         return ConfidenceResult(score=score, label=label, factors=factors)
 
     def _compute_refusal_score(self, response_text: str) -> float:
+        if not any(pattern.search(response_text) for pattern in self.REFUSAL_PATTERNS):
+            return 1.0
+        return 1.0 if self._has_answer_indicators(response_text) else 0.0
+
+    def _has_answer_indicators(self, response_text: str) -> bool:
+        if self.ANSWER_MARKERS.search(response_text):
+            return True
         for pattern in self.REFUSAL_PATTERNS:
-            if pattern.search(response_text):
-                return 0.0
-        return 1.0
+            match = pattern.search(response_text)
+            if match:
+                continuation = response_text[match.end():]
+                if (self.CONTRASTIVE_CONTINUATION.search(continuation)
+                        and not self.REDIRECT_TAIL.search(continuation)):
+                    return True
+        return False
 
     def _compute_legal_relevance(self, response_text: str, user_query: str) -> float:
         combined = f"{response_text} {user_query}".lower()
