@@ -78,6 +78,30 @@ class RedactionEngine:
         "This Agreement",
         "The Recipient",
     }
+    PERSON_LEADIN_WORDS = {
+        "Contact",
+        "Regarding",
+        "Please",
+        "Dear",
+        "Hello",
+        "Hi",
+        "Attention",
+        "Attn",
+        "Re",
+        "Cc",
+        "From",
+        "To",
+        "Subject",
+        "Call",
+        "Email",
+        "Ask",
+        "Meet",
+        "Notify",
+        "Inform",
+        "Visit",
+        "Consult",
+        "Copy",
+    }
     LEGAL_TERMS = {
         "agreement",
         "clause",
@@ -256,17 +280,20 @@ class RedactionEngine:
             for match in pattern.finditer(text):
                 original = match.group(0)
                 candidate_type = entity_type
-                candidate_confidence = self._adjust_confidence(entity_type, original, text, match.start(), confidence)
+                candidate_start = match.start()
+                if entity_type == "PERSON":
+                    original, candidate_start = self._strip_person_leadin(original, candidate_start)
+                candidate_confidence = self._adjust_confidence(entity_type, original, text, candidate_start, confidence)
                 if entity_type == "PERSON":
                     candidate_type, candidate_confidence, rejection_reason = self._classify_person_candidate(
                         original,
                         text,
-                        match.start(),
+                        candidate_start,
                         match.end(),
                         candidate_confidence,
                     )
                     if rejection_reason:
-                        rejected_people.append((original, match.start(), match.end(), candidate_confidence))
+                        rejected_people.append((original, candidate_start, match.end(), candidate_confidence))
                         self._log_rejected_person(original, rejection_reason)
                         continue
                 entry = RedactionEntry(
@@ -274,7 +301,7 @@ class RedactionEngine:
                     original_text=original,
                     replacement=f"[REDACTED_{candidate_type}]",
                     confidence=candidate_confidence,
-                    start=match.start(),
+                    start=candidate_start,
                     end=match.end(),
                 )
                 base_by_entry[id(entry)] = entity_type
@@ -374,6 +401,12 @@ class RedactionEngine:
 
     def _entity_identity_key(self, candidate: str) -> str:
         return " ".join(candidate.strip().strip(".,:;()[]\"'?!").lower().split())
+
+    def _strip_person_leadin(self, candidate: str, start: int) -> Tuple[str, int]:
+        words = candidate.split()
+        if len(words) >= 2 and words[0].lower() in {word.lower() for word in self.PERSON_LEADIN_WORDS}:
+            return " ".join(words[1:]), start + len(words[0]) + 1
+        return candidate, start
 
     def _classify_person_candidate(
         self,
