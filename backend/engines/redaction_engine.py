@@ -296,6 +296,8 @@ class RedactionEngine:
                         rejected_people.append((original, candidate_start, match.end(), candidate_confidence))
                         self._log_rejected_person(original, rejection_reason)
                         continue
+                if entity_type == "PHONE" and self._reject_phone_match(original):
+                    continue
                 entry = RedactionEntry(
                     entity_type=candidate_type,
                     original_text=original,
@@ -407,6 +409,12 @@ class RedactionEngine:
         if len(words) >= 2 and words[0].lower() in {word.lower() for word in self.PERSON_LEADIN_WORDS}:
             return " ".join(words[1:]), start + len(words[0]) + 1
         return candidate, start
+
+    def _reject_phone_match(self, candidate: str) -> bool:
+        if re.fullmatch(r"\d{4}-\d{4}", candidate):
+            return True
+        stripped = candidate.replace("+", "").replace("(", "").replace(")", "")
+        return bool(re.fullmatch(r"\d+", stripped)) and len(stripped) > 11
 
     def _classify_person_candidate(
         self,
