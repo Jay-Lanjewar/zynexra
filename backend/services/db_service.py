@@ -65,6 +65,26 @@ def parse_legacy_json(json_str: str, record_id: int, table_name: str,
         logger.error(f"[DB] Failed to parse legacy JSON -> record_id={record_id}, error={str(e)}")
         return {}, False
 
+def _sanitize_redaction_entities(entities: Any) -> Any:
+    """Remove raw entity values from persisted redaction metadata."""
+    if not isinstance(entities, dict):
+        return entities
+
+    sanitized = {}
+
+    for key, entity in entities.items():
+        if not isinstance(entity, dict):
+            sanitized[key] = entity
+            continue
+
+        safe_entity = dict(entity)
+
+        replacement = safe_entity.get("replacement", "")
+        safe_entity["original_text"] = replacement
+
+        sanitized[key] = safe_entity
+
+    return sanitized
 
 def parse_legacy_entities_json(json_str: str, record_id: int, db_path: str, 
                                 auto_repair: bool = True) -> Tuple[Any, bool]:
@@ -76,7 +96,8 @@ def parse_legacy_entities_json(json_str: str, record_id: int, db_path: str,
     
     try:
         parsed = json.loads(json_str)
-        return parsed, False
+        sanitized = _sanitize_redaction_entities(parsed)
+        return sanitized, False
     except (json.JSONDecodeError, TypeError):
         pass
     
@@ -86,7 +107,8 @@ def parse_legacy_entities_json(json_str: str, record_id: int, db_path: str,
         parsed = ast.literal_eval(json_str)
         
         if auto_repair:
-            repaired_json = json.dumps(parsed)
+            sanitized = _sanitize_redaction_entities(parsed)
+            repaired_json = json.dumps(sanitized)
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             cursor.execute("UPDATE redaction_history SET entities_json = ? WHERE id = ?", 
@@ -96,9 +118,11 @@ def parse_legacy_entities_json(json_str: str, record_id: int, db_path: str,
             logger.info(f"[DB] Legacy JSON repaired -> redaction_id={record_id}")
             logger.info(f"[DB] Redaction record upgraded to valid JSON")
             _redaction_repair_count += 1
-        
-        return parsed, True
-        
+        else:
+            sanitized = _sanitize_redaction_entities(parsed)
+
+        return sanitized, True
+
     except (ValueError, SyntaxError, TypeError) as e:
         logger.error(f"[DB] Failed to parse legacy JSON -> redaction_id={record_id}, error={str(e)}")
         return {}, False

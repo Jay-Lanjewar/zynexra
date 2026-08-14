@@ -22,6 +22,15 @@ class RedactionEntry:
     def to_dict(self) -> Dict[str, object]:
         return asdict(self)
 
+    def to_safe_dict(self) -> Dict[str, object]:
+        return {
+            "entity_type": self.entity_type,
+            "original_text": self.replacement,
+            "replacement": self.replacement,
+            "confidence": self.confidence,
+            "start": self.start,
+            "end": self.end,
+        }
 
 @dataclass
 class RedactionOptions:
@@ -42,9 +51,9 @@ class RedactionResult:
     def to_payload(self, model: str) -> Dict[str, object]:
         return build_redaction_response(
             model=model,
-            original_text=self.original_text,
+            original_text="",
             redacted_text=self.redacted_text,
-            redaction_entities=[entity.to_dict() for entity in self.entities],
+            redaction_entities=[entity.to_safe_dict() for entity in self.entities],
             fallback_used=self.fallback_used
         )
 
@@ -439,7 +448,7 @@ class RedactionEngine:
         return any(term in nearby for term in boilerplate_terms)
 
     def _log_rejected_person(self, candidate: str, reason: str) -> None:
-        logger.debug("[Redaction] Rejected PERSON candidate -> %s (%s)", candidate, reason)
+        logger.debug("[Redaction] Rejected PERSON candidate (reason=%s)", reason)
 
 
 def parse_redaction_options(values: Dict[str, object]) -> RedactionOptions:

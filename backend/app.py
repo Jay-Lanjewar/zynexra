@@ -294,13 +294,13 @@ def ask(q: Query, response_format: Optional[str] = None):
             structured = redaction_result.to_payload(MODEL_NAME)
             session["last_structured_response"] = structured
             if sessions.should_update_history(validation_result):
-                sessions.add_valid_exchange(q.session_id, text, complete_response)
+                sessions.add_valid_exchange(q.session_id, complete_response, complete_response)
 
             # Persist redaction to database
             try:
                 if db_service.available:
                     redaction_types = ",".join(type(e).__name__ for e in redaction_result.entities) if redaction_result.entities else ""
-                    entities_dict = {str(i): e.__dict__ if hasattr(e, '__dict__') else e for i, e in enumerate(redaction_result.entities)}
+                    entities_dict = {str(i): e.to_safe_dict() if hasattr(e, "to_safe_dict") else e for i, e in enumerate(redaction_result.entities)}
                     db_service.insert_redaction(
                         filename="text_input",
                         redaction_count=len(redaction_result.entities),
@@ -426,7 +426,7 @@ def ask(q: Query, response_format: Optional[str] = None):
             if not validate_response(structured, session["mode"]):
                 logger.warning(f"[Schema] {session['mode']} response validation failed during fresh execution")
             if sessions.should_update_history(validation_result):
-                sessions.add_valid_exchange(q.session_id, text, complete_response)
+                sessions.add_valid_exchange(q.session_id, complete_response, complete_response)
 
             # Persist to database based on mode (reuse structured payload - no duplicate rebuild)
             try:
@@ -730,7 +730,7 @@ def ask_file(
                 try:
                     if db_service.available:
                         redaction_types = ",".join(type(e).__name__ for e in redaction_result.entities) if redaction_result.entities else ""
-                        entities_dict = {str(i): e.__dict__ if hasattr(e, '__dict__') else e for i, e in enumerate(redaction_result.entities)}
+                        entities_dict = {str(i): e.to_safe_dict() if hasattr(e, "to_safe_dict") else e for i, e in enumerate(redaction_result.entities)}
                         db_service.insert_redaction(
                             filename=filename or "file_upload",
                             redaction_count=len(redaction_result.entities),
