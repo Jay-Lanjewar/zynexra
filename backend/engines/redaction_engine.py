@@ -298,6 +298,8 @@ class RedactionEngine:
                         continue
                 if entity_type == "PHONE" and self._reject_phone_match(original):
                     continue
+                if entity_type == "ID_NUMBER" and self._reject_id_number_match(original, text, candidate_start, match.end()):
+                    continue
                 entry = RedactionEntry(
                     entity_type=candidate_type,
                     original_text=original,
@@ -415,6 +417,29 @@ class RedactionEngine:
             return True
         stripped = candidate.replace("+", "").replace("(", "").replace(")", "")
         return bool(re.fullmatch(r"\d+", stripped)) and len(stripped) > 11
+
+    ID_NUMBER_LABEL_TERMS = ("id", "passport", "aadhaar", "ssn", "tin", "gstin", "license", "employee")
+
+    def _reject_id_number_match(self, candidate: str, full_text: str, start: int, end: int) -> bool:
+        if re.fullmatch(r"[A-Z]{5}\d{4}[A-Z]", candidate):
+            return False
+        if re.fullmatch(r"[A-Z]{2}\d{2}[A-Z0-9]{11}", candidate):
+            return False
+        if re.fullmatch(r"\d{3}-\d{2}-\d{4}", candidate):
+            return False
+        if re.search(r"\b(?:ID|Passport|Aadhaar|SSN|TIN|GSTIN|License)\b", candidate):
+            return False
+        catch_all = re.fullmatch(r"([A-Z]{1,4})[- ]?(\d{5,12})", candidate)
+        if catch_all is None:
+            return False
+        letters, digits = catch_all.group(1), catch_all.group(2)
+        if len(letters) > 1:
+            window = full_text[max(0, start - 24):end + 24].lower()
+            if not any(term in window for term in self.ID_NUMBER_LABEL_TERMS):
+                return True
+        if len(digits) > 9:
+            return True
+        return False
 
     def _classify_person_candidate(
         self,
