@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Optional, Any, List
 import time
+import hashlib
 from fastapi import UploadFile, File, Form
 from backend.config import settings
 from backend.services.db_service import db_service
@@ -402,11 +403,11 @@ def ask(q: Query, response_format: Optional[str] = None):
                     len(structured.get("issues", [])),
                 )
                 logger.info(
-                    "[VerifierTextDebug] path=/ask text_len=%d has_AS_IS=%s has_TERMINATION=%s text_preview=%s",
+                    "[VerifierTextDebug] path=/ask text_len=%d has_AS_IS=%s has_TERMINATION=%s text_sha256=%s",
                     len(text) if text else 0,
                     "AS IS" in text if text else "N/A",
                     "TERMINATION FOR CONVENIENCE" in text if text else "N/A",
-                    (text[:500] if text else "NO TEXT"),
+                    (hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()[:8] if text else "NO TEXT"),
                 )
                 try:
                     verifier_issues = run_verifiers(text, structured.get("issues", []))
@@ -426,7 +427,7 @@ def ask(q: Query, response_format: Optional[str] = None):
             if not validate_response(structured, session["mode"]):
                 logger.warning(f"[Schema] {session['mode']} response validation failed during fresh execution")
             if sessions.should_update_history(validation_result):
-                sessions.add_valid_exchange(q.session_id, complete_response, complete_response)
+                sessions.add_valid_exchange(q.session_id, text, complete_response)
 
             # Persist to database based on mode (reuse structured payload - no duplicate rebuild)
             try:
@@ -907,8 +908,11 @@ def ask_file(
         inference_duration_ms = (time.time() - inference_start) * 1000
         logger.info("[Perf] inference_ms=%.0f", inference_duration_ms)
         logger.info("[FallbackTrace] stage=app_file_upload_handoff fallback_used=%s", fallback_used)
-        response_preview = raw_response[:500].replace("\n", "\\n")
-        logger.info("[ResponseDebug] raw_response_first_500_chars=%s", response_preview)
+        logger.info(
+            "[ResponseDebug] raw_response_len=%d raw_response_sha256=%s",
+            len(raw_response),
+            hashlib.sha256(raw_response.encode("utf-8", errors="ignore")).hexdigest()[:8],
+        )
         issues = parse_audit_issues(raw_response)
         normalization_start = time.time()
         complete_response, normalized_issues = normalize_audit_response(raw_response, effective_mode, parsed_issues=issues, doc_text=text)
@@ -968,11 +972,11 @@ def ask_file(
                     len(structured.get("issues", [])),
                 )
                 logger.info(
-                    "[VerifierTextDebug] text_len=%d has_AS_IS=%s has_TERMINATION=%s text_preview=%s",
+                    "[VerifierTextDebug] text_len=%d has_AS_IS=%s has_TERMINATION=%s text_sha256=%s",
                     len(text) if text else 0,
                     "AS IS" in text if text else "N/A",
                     "TERMINATION FOR CONVENIENCE" in text if text else "N/A",
-                    (text[:500] if text else "NO TEXT"),
+                    (hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()[:8] if text else "NO TEXT"),
                 )
                 try:
                     verifier_issues = run_verifiers(text, structured.get("issues", []))
