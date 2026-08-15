@@ -203,6 +203,10 @@ def validate_advisory_response(response: Dict[str, Any]) -> bool:
         )
         return False
 
+    if not isinstance(response.get("advisory_text"), str):
+        logger.warning("[Schema] Advisory response advisory_text must be a string")
+        return False
+
     confidence_score = response.get("confidence_score")
     if confidence_score is not None:
         if not isinstance(confidence_score, (int, float)) or not (0.0 <= confidence_score <= 1.0):
@@ -410,8 +414,19 @@ def convert_history_record_to_response(record: Dict[str, Any], record_type: str,
             fallback_used=False
         )
     elif record_type == "advisory":
+        messages = record.get("messages", [])
+        # Format multi-turn conversation into human-readable string (same format
+        # as /history list endpoint). Each turn is rendered as "User: <content>"
+        # "\nAssistant: <content>" on separate lines.
+        if isinstance(messages, list):
+            formatted = "\n".join(
+                f"User: {m.get('user', '')}\nAssistant: {m.get('assistant', '')}"
+                for m in messages if isinstance(m, dict)
+            )
+        else:
+            formatted = str(messages)
         return build_advisory_response(
-            complete_response=record.get("messages", []),
+            complete_response=formatted,
             model=model,
             confidence_score=record.get("confidence_score", 0.0),
             confidence_label=record.get("confidence_label", ""),
