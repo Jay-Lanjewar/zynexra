@@ -64,6 +64,9 @@ export function AdvisoryChatPage({
         <div>
           <h1 className="text-3xl font-semibold text-slate-100">Advisory Chat</h1>
           <p className="mt-1 text-sm text-slate-400">Ask legal-practice questions</p>
+          <p className="mt-2 text-xs text-slate-500">
+            This is informational only and does not constitute legal advice. Laws vary by jurisdiction.
+          </p>
         </div>
         <div className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-400">
           <ShieldCheck className="h-4 w-4 text-emerald-400" aria-hidden="true" />

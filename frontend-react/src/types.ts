@@ -141,6 +141,7 @@ export type AuditResponse = {
   confidence_score?: number;
   confidence_label?: ConfidenceLabel;
   metadata?: ConfidenceMetadata;
+  disclaimer?: string;
 } & Partial<PolicyNotice> & Partial<NonLegalNotice>;
 
 export type CategoryGroup = {

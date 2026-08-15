@@ -118,6 +118,7 @@ class AdvisoryResponse:
     structured_parse_failed: bool = False
     legacy_text: str = ""
     advisory_text: str = ""
+    disclaimer: str = ""
     confidence_score: float = 0.0
     confidence_label: str = ""
     quality_warning: str = ""
@@ -352,6 +353,11 @@ def build_advisory_response(
         structured_parse_failed=False,
         legacy_text=complete_response,
         advisory_text=complete_response,
+        disclaimer=("This is informational only and does not constitute legal advice. "
+                    "I am not a lawyer. Laws vary by jurisdiction. "
+                    "I cannot provide jurisdiction-specific guidance. "
+                    "Do not rely on this for legal decisions. "
+                    "If you require legal counsel, consult a qualified attorney."),
         confidence_score=confidence_score,
         confidence_label=confidence_label,
         quality_warning=quality_warning,
