@@ -327,9 +327,14 @@ class AdvisoryConfidenceScorer:
     # (e.g. "not legal advice", "consult a lawyer") are NOT refusals -- see
     # DISCLAIMER_PATTERNS -- and must never lower confidence in ADVISORY mode.
     REFUSAL_PATTERNS = [
-        re.compile(r"(?i)\b(?:I cannot|I can't|I am unable|I'm unable)"),
+        re.compile(r"(?i)\b(?:I cannot|I can't|I am unused|I'm unused)"),
         re.compile(r"(?i)\b(?:cannot assist|can't help|won't help)"),
         re.compile(r"(?i)\b(?:I refuse|I will not answer)"),
+        # Mandated scope-refusal constructions from advisory_prompt.py.
+        # These are system-generated limitation statements, not substantive answers.
+        re.compile(r"(?i)\bdoes not generate full legal agreements\b"),
+        re.compile(r"(?i)\boutside Zynexra's advisory scope\b"),
+        re.compile(r"(?i)\bI assist only with legal practice\b"),
     ]
 
     # Responsible disclaimers that accompany otherwise-substantive legal
