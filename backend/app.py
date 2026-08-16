@@ -349,7 +349,7 @@ def ask(q: Query, response_format: Optional[str] = None):
     if json_response_mode:
         inference_start = time.time()
         try:
-            raw_response, fallback_used, _analysis_metadata = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
+            raw_response, fallback_used, analysis_metadata = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
             inference_duration_ms = (time.time() - inference_start) * 1000
             logger.info("[Perf] inference_ms=%.0f", inference_duration_ms)
             logger.info("[FallbackTrace] stage=app_json_response_handoff fallback_used=%s", fallback_used)
@@ -387,7 +387,7 @@ def ask(q: Query, response_format: Optional[str] = None):
         if validation_result.is_valid:
             session["last_report"] = complete_response
             logger.info("[FallbackTrace] stage=app_build_audit_payload fallback_used=%s", fallback_used)
-            structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms, parsed_issues=normalized_issues)
+            structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms, parsed_issues=normalized_issues, analysis_metadata=analysis_metadata)
             if fallback_used:
                 structured["fallback_used"] = True
                 if "metadata" in structured:
@@ -470,7 +470,7 @@ def ask(q: Query, response_format: Optional[str] = None):
         # Always try fast model first. ResponseGenerator handles fallback internally.
         try:
             inference_start = time.time()
-            raw_response, fallback_used, _analysis_metadata = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
+            raw_response, fallback_used, analysis_metadata = response_generator.generate_response(messages, settings.MODEL_FAST, session["mode"])
             inference_duration_ms = (time.time() - inference_start) * 1000
             logger.info("[Perf] inference_ms=%.0f", inference_duration_ms)
             logger.info("[FallbackTrace] stage=app_streaming_response_handoff fallback_used=%s", fallback_used)
@@ -517,7 +517,7 @@ def ask(q: Query, response_format: Optional[str] = None):
                 final_response = complete_response
                 session["last_report"] = complete_response
                 logger.info("[FallbackTrace] stage=app_streaming_build_payload fallback_used=%s", fallback_used)
-                structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms, parsed_issues=normalized_issues)
+                structured = build_mode_json_payload(complete_response, MODEL_NAME, session["mode"], user_query=text, fallback_used=fallback_used, inference_duration_ms=inference_duration_ms, parsed_issues=normalized_issues, analysis_metadata=analysis_metadata)
                 if fallback_used:
                     structured["fallback_used"] = True
                     if "metadata" in structured:

@@ -947,9 +947,10 @@ def build_mode_json_payload(
         )
         metadata = {
             "model_name": model,
-            "inference_duration_ms": 0,
+            "inference_duration_ms": inference_duration_ms,
             "fallback_used": fallback_used,
             "semantic_suppressed": semantic_suppressed,
+            "analysis_metadata": analysis_metadata if analysis_metadata else {},
         }
         if input_quality_degraded:
             metadata["input_quality"] = "LOW"
