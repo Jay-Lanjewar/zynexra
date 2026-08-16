@@ -66,7 +66,7 @@ class ValidationEngine:
             response_lower = response.lower()
 
             # 1. Identity Check (Creator Name Integrity)
-            if context.session_mode != "REDACTION" and "lanjewar" in context.user_input.lower() and "jay" not in response_lower:
+            if context.session_mode != "REDACTION" and context.is_creator_question and "lanjewar" in context.user_input.lower() and "jay" not in response_lower:
                 return ValidationResult(
                     is_valid=False,
                     violation_type="identity_guard",
