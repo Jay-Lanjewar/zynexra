@@ -337,10 +337,8 @@ def ask(q: Query, response_format: Optional[str] = None):
     prompt_start = time.time()
     system_prompt = build_execution_prompt(session["mode"])
 
-    # Inject task anchor if provided (e.g. for file uploads)
-    if q.task_anchor:
-        system_prompt = f"{q.task_anchor}\n\n{system_prompt}"
-
+    # Inject session history as message turns after the system prompt
+    # (task_anchor prepending removed — see P1 #4 duplicate-history fix)
     messages = [{"role": "system", "content": system_prompt}]
     for turn in session["history"]:
         messages.append({"role": "user", "content": turn["user"]})
