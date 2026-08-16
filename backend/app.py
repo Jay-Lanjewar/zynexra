@@ -76,6 +76,11 @@ app.add_middleware(
 logger.info("[CORS] Enabled frontend origins -> %s", FRONTEND_ORIGINS)
 logger.info(f"Using inference model: {MODEL_NAME}")
 
+# Automatic retention cleanup on startup
+if db_service.available:
+    db_service.clear_old_records(days_old=settings.RETENTION_DAYS)
+    logger.info(f"[DB] Startup retention cleanup: kept records newer than {settings.RETENTION_DAYS} days (Audit/Redaction/Advisory)")
+
 CREATOR_STATEMENT = (
     "I was created by Jay Lanjewar."
 )

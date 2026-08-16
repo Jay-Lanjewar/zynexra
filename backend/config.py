@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
 
+    RETENTION_DAYS: int = 90
+
     # Raw file size limits per type (in bytes)
     MAX_PDF_SIZE: int = 25 * 1024 * 1024       # 25 MB
     MAX_DOC_SIZE: int = 15 * 1024 * 1024       # 15 MB
