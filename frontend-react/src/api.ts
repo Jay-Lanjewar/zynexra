@@ -175,17 +175,6 @@ export async function askAdvisoryQuestion(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000);
 
-    const contextMessages = history.slice(-8);
-
-    // task_anchor removed per P1 #4 — duplicate-history fix.
-    // The server-side session history (injected as message turns
-    # in app.py) is the single canonical source of prior conversation
-    # context; sending a frontend‑constructed task_anchor would cause
-    # duplicate context and could place user-controlled content above
-    # the identity/safety guard in the prompt.
-    // Keep contextMessages available for potential future use but
-    // do not build or send task_anchor.
-
     const response = await fetch(`${API_BASE_URL}/ask?response_format=json`, {
       method: "POST",
       headers: {

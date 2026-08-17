@@ -465,6 +465,24 @@ INPUT_QUALITY_WARNING = "Document quality appears degraded or corrupted. Results
 SEMANTIC_SUPPRESSION_MESSAGE = "Document quality too degraded for reliable legal analysis."
 
 
+# -[ jurisdiction detection ]--------------------------
+_JURISDICTION_INDIA_KW = re.compile(r"(?i)\b(Indian law|India|Indian Contract|Specific Relief)\b")
+_JURISDICTION_GROUNDING = re.compile(r"(?i)\b(see|cited|statute|case|precedent|section)\b")
+
+
+def _detect_jurisdiction_from_text(text: str) -> str:
+    """Detect jurisdiction from legal text. Returns 'India' or 'not specified'."""
+    if _JURISDICTION_INDIA_KW.search(text):
+        return "India"
+    return "not specified"
+
+
+def _has_authoritative_grounding(text: str) -> bool:
+    """Check for authoritative legal grounding signals (citations, statutes, cases)."""
+    return bool(_JURISDICTION_GROUNDING.search(text))
+# -------------------------------------------------------
+
+
 def _assess_quoted_text_quality(text: str) -> bool:
     """Check if input text has poor quality indicators that would make legal analysis unreliable.
 
@@ -668,6 +686,7 @@ def build_audit_json_payload(
 
     # --- Semantic Suppression ---
     semantic_suppressed = False
+    metadata = {}
     if fallback_used and input_quality_degraded and _assess_quoted_text_quality(user_input):
         semantic_suppressed = True
         logger.warning(
@@ -932,6 +951,17 @@ def build_mode_json_payload(
         quality_warning = INPUT_QUALITY_WARNING if input_quality_degraded else ""
 
         semantic_suppressed = False
+        metadata = {
+            "model_name": model,
+            "inference_duration_ms": inference_duration_ms,
+            "fallback_used": fallback_used,
+            "semantic_suppressed": semantic_suppressed,
+            "analysis_metadata": analysis_metadata if analysis_metadata else {},
+        }
+        _jurisd = _detect_jurisdiction_from_text(user_query)
+        if _jurisd == "not specified":
+            _jurisd = _detect_jurisdiction_from_text(complete_response)
+        metadata["jurisdiction"] = _jurisd
         if fallback_used and input_quality_degraded and _assess_quoted_text_quality(user_query):
             semantic_suppressed = True
             logger.warning(
@@ -944,15 +974,10 @@ def build_mode_json_payload(
             user_query=user_query,
             input_quality_degraded=input_quality_degraded,
             fallback_used=fallback_used,
+            metadata=metadata,
         )
-        metadata = {
-            "model_name": model,
-            "inference_duration_ms": inference_duration_ms,
-            "fallback_used": fallback_used,
-            "semantic_suppressed": semantic_suppressed,
-            "analysis_metadata": analysis_metadata if analysis_metadata else {},
-        }
         if input_quality_degraded:
+            metadata["input_quality"] = "LOW"
             metadata["input_quality"] = "LOW"
             metadata["input_quality_score"] = round(quality_result.score, 4)
             metadata["input_quality_warnings"] = quality_result.warnings

@@ -395,7 +395,7 @@ class AdvisoryConfidenceScorer:
     QUALITY_CAP_MAX_SCORE = 0.30
     FALLBACK_DEGRADED_CAP_MAX_SCORE = 0.25
 
-    def compute(self, response_text: str, user_query: str = "", input_quality_degraded: bool = False, fallback_used: bool = False) -> ConfidenceResult:
+    def compute(self, response_text: str, user_query: str = "", input_quality_degraded: bool = False, fallback_used: bool = False, metadata: Optional[Dict[str, Any]] = None) -> ConfidenceResult:
         logger.info("[FallbackTrace] stage=advisory_confidence_scorer_compute fallback_used=%s input_quality_degraded=%s", fallback_used, input_quality_degraded)
         factors: Dict[str, float] = {}
 
@@ -442,6 +442,24 @@ class AdvisoryConfidenceScorer:
                 "[Confidence] ADVISORY -> refusal detected: score capped to %.2f (LOW)",
                 self.REFUSAL_MAX_SCORE,
             )
+
+        # -[ jurisdiction grounding penalty ]------------------------
+        # When jurisdiction is "not specified", HIGH confidence requires
+        # authoritative grounding signals (citations, statutes, cases).
+        # This prevents long keyword-rich answers from getting HIGH just
+        # from legal-topic keyword frequency without actual legal authority.
+        if metadata and metadata.get("jurisdiction") == "not specified":
+            has_grounding = (
+                bool(re.search(r"(?i)\b(see|cited|statute|case|precedent|section)\b", response_text))
+                or bool(re.search(r"(?i)\b(Indian law|India|Indian Contract|Specific Relief)\b", response_text))
+            )
+            if not has_grounding and score > 0.5:
+                score *= 0.5
+                logger.warning(
+                    "[Confidence] ADVISORY -> jurisdiction-unmoderated HIGH capped to %.2f (no grounding, jurisdiction not specified)",
+                    score,
+                )
+        # ---------------------------------------------------------
 
         label = _label_from_score(score)
 
