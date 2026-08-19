@@ -50,7 +50,9 @@ def test_redaction_output_still_rejects_first_person_ai_disclosure(redaction_eng
 
 
 @pytest.mark.parametrize("mode", ["AUDIT", "ADVISORY"])
-def test_creator_attribution_guard_still_active_for_other_modes(mode):
+def test_creator_guard_ordinary_question_with_lanjewar_does_not_trigger(mode):
+    """Ordinary AUDIT/ADVISORY questions containing 'Lanjewar' as a contract party
+    do NOT trigger the identity guard when is_creator_question=False."""
     result = ValidationEngine().validate_response(
         "The document is governed by Delaware law.",
         ValidationContext(
@@ -59,5 +61,21 @@ def test_creator_attribution_guard_still_active_for_other_modes(mode):
             is_creator_question=False,
         ),
     )
-    assert result.is_valid is False
+    # Guard should not trigger for ordinary questions; only genuine creator questions
+    assert result.is_valid is True, f"Guard should not trigger for ordinary question: {result.violation_reason}"
+
+
+def test_creator_guard_still_active_for_genuine_creator_question():
+    """Genuine creator questions in AUDIT/ADVISORY still trigger the creator guard
+    when the response misattributes/omits creator identity."""
+    result = ValidationEngine().validate_response(
+        "The document is governed by Delaware law.",
+        ValidationContext(
+            user_input="Explain the agreement made by Lanjewar.",
+            session_mode="AUDIT",
+            is_creator_question=True,
+        ),
+    )
+    # Guard should trigger for genuine creator questions
+    assert result.is_valid is False, f"Guard should trigger for creator question: {result.violation_reason}"
     assert result.violation_type == "identity_guard"
